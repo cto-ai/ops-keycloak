@@ -1,23 +1,24 @@
-import qs from 'querystring'
-import { once, on } from 'events'
-import { promisify } from 'util'
-import { createServer } from 'http'
-import Keycloak from 'keycloak-connect'
-import open from 'open'
-import got from 'got'
-import uuid from 'uuid'
-import createDebug from 'debug'
+const qs = require('querystring')
+const { once, on } = require('events')
+const { promisify } = require('util')
+const { createServer } = require('http')
+const Keycloak = require('keycloak-connect')
+const open = require('open')
+const got = require('got')
+const uuid = require('uuid')
+const createDebug = require('debug')
 
 const debug = createDebug('ops:local-config')
 
 const parse = (urlPath) => new URL(`x://${urlPath}`)
 
-export const ERR_PAGE = (page) => `pages.${page} must be a buffer`
-export const ERR_REALM = 'realm is required'
-export const ERR_URL = 'url is required'
-export const ERR_ID = 'id is required'
-export const ERR_INVALID_REFRESH = 'Invalid response for refresh request'
-export const ERR_INVALID_GRANT = 'Invalid grant'
+module.exports = keycloak
+module.exports.ERR_PAGE = (page) => `pages.${page} must be a buffer`
+module.exports.ERR_REALM = 'realm is required'
+module.exports.ERR_URL = 'url is required'
+module.exports.ERR_ID = 'id is required'
+module.exports.ERR_INVALID_REFRESH = 'Invalid response for refresh request'
+module.exports.ERR_INVALID_GRANT = 'Invalid grant'
 
 class Granter extends Keycloak {
   constructor (config) {
@@ -51,7 +52,7 @@ class Granter extends Keycloak {
   }
 }
 
-export default function keycloak (opts = {}) {
+function keycloak (opts = {}) {
   const { pages = {}, realm, url, id } = opts
 
   for (const page of ['signup', 'signin', 'error']) {

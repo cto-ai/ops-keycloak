@@ -1,20 +1,17 @@
-import fs from 'fs'
-import qs from 'querystring'
-import { resolve, join, dirname } from 'path'
-import { createServer } from 'http'
-import { once } from 'events'
-import { promisify } from 'util'
-import { fileURLToPath } from 'url'
-import { test } from 'tapx'
-import { when } from 'nonsynchronous'
-import got from 'got'
-import lazaretto from 'lazaretto'
-import jwt from 'jsonwebtoken'
-import keycloak, { ERR_INVALID_GRANT, ERR_INVALID_REFRESH, ERR_PAGE } from '../index.js'
 
+const fs = require('fs')
+const qs = require('querystring')
+const { join } = require('path')
+const { createServer } = require('http')
+const { once } = require('events')
+const { promisify } = require('util')
+const { test } = require('tap')
+const { when } = require('nonsynchronous')
+const got = require('got')
+const jwt = require('jsonwebtoken')
+const keycloak = require('..')
+const { ERR_INVALID_GRANT, ERR_INVALID_REFRESH, ERR_PAGE } = keycloak
 const { readFile } = fs.promises
-const __dirname = dirname(fileURLToPath(import.meta.url))
-const keycloakEntry = resolve(__dirname, '..', 'index.js')
 
 
 const certs = async (server) => {
@@ -42,46 +39,39 @@ const certs = async (server) => {
   res.setHeader('content-type', 'application/json')
   res.end(JSON.stringify(certs))
 }
+const requireWithMocks = (module, mocks) => {
+  for (const id of Object.keys(require.cache)) {
+    delete require.cache[id]
+  }
+  for (const [name, exports] of Object.entries(mocks)) {
+    require.cache[require.resolve(name)] = { exports }
+  }
+  return require(module)
+}
+
 
 test('signup', async ({ is, ok, teardown }) => {
   const server = createServer()
   teardown(() => server.close)
   await promisify(server.listen.bind(server))()
   const service = `http://localhost:${server.address().port}`
+  const context = {}
   const until = when()
-  const context = {
-    service,
-    set url (value) {  // eslint-disable-line
-      Object.defineProperty(this, 'url', { value, writable: true })
+  const keycloak = requireWithMocks('..', {
+    open: (url) => {
+      context.url = url
       until()
     }
-  }
-  const mock = {
-    async open (_, { context }) {
-      return (url) => {
-        context.url = url
-      }
-    }
-  }
-  const sandbox = await lazaretto({
-    esm: true,
-    entry: keycloakEntry,
-    context,
-    mock,
-    teardown
   })
-  const done = sandbox(`
-    (async () => {
-      $$$.context.result = await exports({
-        pages: {
-          signup: Buffer.from('signup'), signin: Buffer.from('signin'), error: Buffer.from('error')
-        },
-        realm: 'test',
-        url: $$$.context.service,
-        id: 'test-id'
-      }).signup()
-    })().catch(console.error)
-  `)
+  
+  const transaction = keycloak({
+    pages: {
+      signup: Buffer.from('signup'), signin: Buffer.from('signin'), error: Buffer.from('error')
+    },
+    realm: 'test',
+    url: service,
+    id: 'test-id'
+  }).signup()
   await until.done()
   const { pathname, searchParams } = new URL(context.url)
   const redirect = decodeURIComponent(searchParams.get('redirect_uri'))
@@ -154,8 +144,7 @@ test('signup', async ({ is, ok, teardown }) => {
   await certs(server)
   const page = await get
   is(page.body, 'signup')
-  await done
-  const { result } = context
+  const result = await transaction
   ok(result.accessToken)
   ok(result.refreshToken)
   ok(result.idToken)
