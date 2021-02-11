@@ -4,10 +4,6 @@
 
 Straightforward [Keycloak](https://www.keycloak.org/) integration.
 
-## Status
-
-WIP - Do not use
-
 ## API
 
 This is a native ESM module.
