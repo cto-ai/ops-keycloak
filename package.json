@@ -32,11 +32,11 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/cto-ai/ops-local-config.git"
+    "url": "git+https://github.com/cto-ai/ops-keycloak.git"
   },
   "keywords": [],
   "bugs": {
-    "url": "https://github.com/cto-ai/ops-local-config/issues"
+    "url": "https://github.com/cto-ai/ops-keycloak/issues"
   },
-  "homepage": "https://github.com/cto-ai/ops-local-config#readme"
+  "homepage": "https://github.com/cto-ai/ops-keycloak#readme"
 }
