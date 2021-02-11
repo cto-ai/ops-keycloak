@@ -14,7 +14,7 @@ Straightforward [Keycloak](https://www.keycloak.org/) integration.
 * `url` - the keycloak server URL
 * `id` - client id
 * `pages` - an object that must contain the following properties: `signup`, `signin`, `error`. Each must hold a [`Buffer`](https://nodejs.org/api/buffer.html) instance, containin HTML to redirect a users browser after a user has registered, logged in or if there was an error, respectively.
-* `backend` default: `false` -  backend mode limited API. Only functionality that doesn't rely on client-side browser interactions is supplied: `refresh`, `signout` and `signin`, where `signin` must be passed user and password.
+* `backend` default: `false` -  backend mode limited API. Only functionality that doesn't rely on client-side browser interactions is supplied: `refresh`, `signout` and `signin`, where `signin` must be passed user and password. Pages are not required when `backend` is `true`.
 
 *Tokens objects:*
 
