@@ -2,7 +2,7 @@
 
 > CTO.ai Keycloak library
 
-Straightforward, bounded. [Keycloak](https://www.keycloak.org/) integration.
+Straightforward [Keycloak](https://www.keycloak.org/) integration.
 
 ## Status
 
@@ -68,7 +68,7 @@ Will open a browser at a Keycloak password reset URL, which differs based on the
 
 ## Caveats
 
-This library does not attempt to provide full Keycloak functionality integration. Currently only public clients are supported.
+This library does not attempt to provide anything close to full Keycloak functionality integration.
 
 ## Engines
 
