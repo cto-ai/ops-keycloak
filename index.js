@@ -75,63 +75,67 @@ function keycloak (opts = {}) {
   async function auth (navTo, page) {
     const server = createServer()
     await promisify(server.listen.bind(server))()
-    const { port } = server.address()
-    const redir = `http://localhost:${port}${endpoint}`
-    const params = qs.stringify({
-      client_id: id,
-      redirect_uri: redir,
-      response_type: 'code',
-      scope: 'openid token',
-      nonce: uuid(),
-      state: uuid()
-    })
-    open(`${navTo}?${params}`)
-    for await (const [req, res] of on(server, 'request')) {
-      if (req.method !== 'GET') {
-        res.statusCode = 400
-        res.end(pages.error)
-        continue
-      }
-      const { pathname, searchParams } = parse(req.url)
-
-      if (pathname !== endpoint) {
-        res.statusCode = 404
-        res.end(pages.error)
-        continue
-      }
-      const code = searchParams.get('code')
-
-      if (!code) {
-        res.statusCode = 400
-        res.end(pages.error)
-        continue
-      }
-      const data = qs.stringify({
-        code: code,
-        grant_type: 'authorization_code',
+    try {
+      const { port } = server.address()
+      const redir = `http://localhost:${port}${endpoint}`
+      const params = qs.stringify({
         client_id: id,
-        redirect_uri: redir
+        redirect_uri: redir,
+        response_type: 'code',
+        scope: 'openid token',
+        nonce: uuid(),
+        state: uuid()
       })
-      const result = await got.post(tokensUrl, {
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
-          'Content-Length': data.length
-        },
-        body: data
-      }).json()
-      if (!result.access_token || !result.refresh_token || !result.id_token || !result.session_state) {
-        res.statusCode = 500
-        res.end(pages.error)
-        await once(res, 'finish')
-        server.close()
-        throw Error(ERR_INVALID_RESPONSE)
+      open(`${navTo}?${params}`)
+      for await (const [req, res] of on(server, 'request')) {
+        if (req.method !== 'GET') {
+          res.statusCode = 400
+          res.end(pages.error)
+          continue
+        }
+        const { pathname, searchParams } = parse(req.url)
+
+        if (pathname !== endpoint) {
+          res.statusCode = 404
+          res.end(pages.error)
+          continue
+        }
+        const code = searchParams.get('code')
+
+        if (!code) {
+          res.statusCode = 400
+          res.end(pages.error)
+          continue
+        }
+        const data = qs.stringify({
+          code: code,
+          grant_type: 'authorization_code',
+          client_id: id,
+          redirect_uri: redir
+        })
+        const result = await got.post(tokensUrl, {
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'Content-Length': data.length
+          },
+          body: data
+        }).json()
+        if (!result.access_token || !result.refresh_token || !result.id_token || !result.session_state) {
+          res.statusCode = 400
+          const finish = once(res, 'finish')
+          res.end(pages.error)
+          await finish
+          throw Error(ERR_INVALID_RESPONSE)
+        }
+        const grant = await granter.convert(result)
+        const finish = once(res, 'finish')
+        res.end(page)
+        await finish
+        return grant
       }
-      const grant = await granter.convert(result)
-      const finish = once(res, 'finish')
-      res.end(page)
-      await finish
+    } finally {
       server.close()
-      return grant
+      await once(server, 'close')
     }
   }
 
