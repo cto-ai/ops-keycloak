@@ -6,6 +6,7 @@ const Keycloak = require('keycloak-connect')
 const open = require('open')
 const got = require('got')
 const uuid = require('uuid')
+const jwt = require('jsonwebtoken')
 const createDebug = require('debug')
 
 const debug = createDebug('ops:local-config')
@@ -13,6 +14,7 @@ const debug = createDebug('ops:local-config')
 const parse = (urlPath) => new URL(`x://${urlPath}`)
 
 module.exports = keycloak
+module.exports.validate = validate
 const ERR_PAGE = module.exports.ERR_PAGE = (page) => `pages.${page} must be a buffer`
 const ERR_REALM = module.exports.ERR_REALM = 'realm is required'
 const ERR_URL = module.exports.ERR_URL = 'url is required'
@@ -46,13 +48,34 @@ class Granter extends Keycloak {
   }
 }
 
+const dbg = (api) => {
+  if (debug.enabled === false) return api
+  for (const [k, fn] of Object.entries(api)) {
+    api[k] = async (...args) => {
+      try {
+        return await fn(...args)
+      } catch (err) {
+        debug(err)
+        throw err
+      }
+    }
+  }
+  return api
+}
+
+function validate ({ refreshToken } = {}) {
+  if (!refreshToken) throw Error(ERR_MISSING_REFRESH_TOKEN)
+  const { exp } = jwt.decode(refreshToken)
+  return Math.floor(Date.now() / 1000) < exp
+}
+
 function keycloak (opts = {}) {
   const { pages = {}, realm, url, id, backend = false } = opts
-  
+
   if (!realm) throw Error(ERR_REALM)
   if (!url) throw Error(ERR_URL)
   if (!id) throw Error(ERR_ID)
-  
+
   const config = {
     realm,
     'auth-server-url': url,
@@ -72,16 +95,17 @@ function keycloak (opts = {}) {
   const logoutsUrl = `${url}/realms/${realm}/protocol/openid-connect/logout`
 
   if (backend) {
-    return {
-      refresh, 
+    return dbg({
+      refresh,
       signout,
       async signin ({ user, password } = {}) {
         if (!user || !password) throw Error(ERR_BACKEND_SIGNIN)
-        return signin({user, password})
+        return signin({ user, password })
       },
+      validate,
       async signup () { throw Error(ERR_BACKEND_METHOD_NOT_SUPPORTED('signup')) },
-      reset () { throw Error(ERR_BACKEND_METHOD_NOT_SUPPORTED('reset')) },
-    }
+      reset () { throw Error(ERR_BACKEND_METHOD_NOT_SUPPORTED('reset')) }
+    })
   }
 
   for (const page of ['signup', 'signin', 'error']) {
@@ -250,22 +274,7 @@ function keycloak (opts = {}) {
     open(signedIn ? passwordsUrl : resetsUrl)
   }
 
-  const dbg = (api) => {
-    if (debug.enabled === false) return api
-    for (const [k, fn] of Object.entries(api)) {
-      api[k] = async (...args) => {
-        try {
-          return await fn(...args)
-        } catch (err) {
-          debug(err)
-          throw err
-        }
-      }
-    }
-    return api
-  }
-
   return dbg({
-    signup, signin, signout, refresh, reset
+    signup, signin, signout, validate, refresh, reset
   })
 }

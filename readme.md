@@ -6,8 +6,6 @@ Straightforward [Keycloak](https://www.keycloak.org/) integration.
 
 ## API
 
-This is a native ESM module.
-
 ### `keycloak(opts) => instance`
 
 **Options:**
@@ -62,6 +60,16 @@ Will open a browser at a Keycloak password reset URL, which differs based on the
 **Options:**
 
 * `signedIn` (`boolean`), Default: `false` - If `true` the browser will open to the logged-in accounts password page. If `false` it will open to reset credentials page.
+
+### `instance.validate(tokens) => boolean`
+
+See [`keycloak.validate`](#keycloak-validate)
+
+
+### `keycloak.validate(tokens) => boolean`
+
+Checks whether `tokens.refreshToken` has expired. If it has `validate` returns `true`, otherwise `false`.
+
 
 ## Caveats
 

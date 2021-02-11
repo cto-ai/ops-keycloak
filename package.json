@@ -18,12 +18,12 @@
   "dependencies": {
     "debug": "^4.3.1",
     "got": "^11.8.1",
+    "jsonwebtoken": "^8.5.1",
     "keycloak-connect": "^12.0.2",
     "open": "^7.4.0",
     "tap": "^14.11.0"
   },
   "devDependencies": {
-    "jsonwebtoken": "^8.5.1",
     "nonsynchronous": "^1.2.0",
     "pre-commit": "^1.2.2",
     "standard": "^16.0.3"

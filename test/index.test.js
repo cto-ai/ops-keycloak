@@ -62,44 +62,44 @@ const requireWithMocks = (module, mocks) => {
 
 test('option validation', async ({ throws, doesNotThrow }) => {
   throws(() => keycloak(), Error(ERR_REALM))
-  throws(() => keycloak({ realm: 'test'}), Error(ERR_URL))
-  throws(() => keycloak({ realm: 'test',  url: 'http://localhost:8080'}), Error(ERR_ID))
-  throws(() => keycloak({ realm: 'test',  url: 'http://localhost:8080', id: 'test'}), Error(ERR_PAGE('signup')))
+  throws(() => keycloak({ realm: 'test' }), Error(ERR_URL))
+  throws(() => keycloak({ realm: 'test', url: 'http://localhost:8080' }), Error(ERR_ID))
+  throws(() => keycloak({ realm: 'test', url: 'http://localhost:8080', id: 'test' }), Error(ERR_PAGE('signup')))
   throws(() => keycloak({
     pages: {},
     realm: 'test',
     url: 'http://localhost:8080',
-    id: 'test',
+    id: 'test'
   }), Error(ERR_PAGE('signup')))
   throws(() => keycloak({
-    pages: { signup: 'test'  },
+    pages: { signup: 'test' },
     realm: 'test',
     url: 'http://localhost:8080',
-    id: 'test',
+    id: 'test'
   }), Error(ERR_PAGE('signup')))
   throws(() => keycloak({
-    pages: { signup: Buffer.from('test')},
+    pages: { signup: Buffer.from('test') },
     realm: 'test',
     url: 'http://localhost:8080',
-    id: 'test',
+    id: 'test'
   }), Error(ERR_PAGE('signin')))
   throws(() => keycloak({
     pages: { signup: Buffer.from('test'), signin: 'test' },
     realm: 'test',
     url: 'http://localhost:8080',
-    id: 'test',
+    id: 'test'
   }), Error(ERR_PAGE('signin')))
   throws(() => keycloak({
     pages: { signup: Buffer.from('test'), signin: Buffer.from('test') },
     realm: 'test',
     url: 'http://localhost:8080',
-    id: 'test',
+    id: 'test'
   }), Error(ERR_PAGE('error')))
   throws(() => keycloak({
     pages: { signup: Buffer.from('test'), signin: Buffer.from('test'), error: 'test' },
     realm: 'test',
     url: 'http://localhost:8080',
-    id: 'test',
+    id: 'test'
   }), Error(ERR_PAGE('error')))
   doesNotThrow(() => keycloak({
     pages: { signup: Buffer.from('test'), signin: Buffer.from('test'), error: Buffer.from('test') },
@@ -108,26 +108,130 @@ test('option validation', async ({ throws, doesNotThrow }) => {
     id: 'test'
   }))
   throws(() => keycloak({
-    backend: true, 
+    backend: true,
     url: 'http://localhost:8080',
     id: 'test'
   }))
   throws(() => keycloak({
-    backend: true, 
+    backend: true,
     realm: 'test',
     id: 'test'
   }))
   throws(() => keycloak({
-    backend: true, 
+    backend: true,
     realm: 'test',
     url: 'http://localhost:8080'
   }))
   doesNotThrow(() => keycloak({
-    backend: true, 
+    backend: true,
     realm: 'test',
     url: 'http://localhost:8080',
     id: 'test'
   }))
+})
+
+test('validate', async ({ is, throws }) => {
+  const sig = await readFile(join(__dirname, 'fixtures', 'private.pem'))
+  const validToken = jwt.sign({
+    jti: 'ea5f888e-61dc-4369-a910-95617e12a5c1',
+    nbf: 0,
+    iss: 'http://localhost:8080/realms/test',
+    sub: 'd7b55810-239b-4837-bd4d-125a40c9a1fc',
+    typ: 'Bearer',
+    azp: 'test-id',
+    nonce: 'b2c82b30-6b3a-11eb-aefb-db0eadc96f2e',
+    session_state: '45cdc1df-f8eb-4470-864d-235196ec09c6',
+    acr: '1',
+    scope: 'openid email profile',
+    email_verified: false,
+    name: 'test test',
+    preferred_username: 'test',
+    given_name: 'test',
+    family_name: 'test',
+    email: 'test@test.com'
+  }, sig, { algorithm: 'RS256', expiresIn: 2592000, header: { kid: 'testkid' } })
+
+  const invalidToken = jwt.sign({
+    jti: 'ea5f888e-61dc-4369-a910-95617e12a5c1',
+    nbf: 0,
+    iss: 'http://localhost:8080/realms/test',
+    sub: 'd7b55810-239b-4837-bd4d-125a40c9a1fc',
+    typ: 'Bearer',
+    azp: 'test-id',
+    nonce: 'b2c82b30-6b3a-11eb-aefb-db0eadc96f2e',
+    session_state: '45cdc1df-f8eb-4470-864d-235196ec09c6',
+    acr: '1',
+    scope: 'openid email profile',
+    email_verified: false,
+    name: 'test test',
+    preferred_username: 'test',
+    given_name: 'test',
+    family_name: 'test',
+    email: 'test@test.com'
+  }, sig, { algorithm: 'RS256', expiresIn: 0, header: { kid: 'testkid' } })
+  is(keycloak.validate({
+    accessToken: validToken,
+    refreshToken: validToken,
+    idToken: validToken,
+    sessionState: validToken
+  }), true)
+
+  is(keycloak.validate({
+    accessToken: validToken,
+    refreshToken: invalidToken,
+    idToken: validToken,
+    sessionState: validToken
+  }), false)
+
+  throws(() => keycloak.validate(), Error(ERR_MISSING_REFRESH_TOKEN))
+
+  const instance = keycloak({
+    pages: {
+      signup: Buffer.from('signup'), signin: Buffer.from('signin'), error: Buffer.from('error')
+    },
+    realm: 'test',
+    url: 'http://localhost:8080',
+    id: 'test-id'
+  })
+
+  is(instance.validate({
+    accessToken: validToken,
+    refreshToken: validToken,
+    idToken: validToken,
+    sessionState: validToken
+  }), true)
+
+  is(instance.validate({
+    accessToken: validToken,
+    refreshToken: invalidToken,
+    idToken: validToken,
+    sessionState: validToken
+  }), false)
+
+  throws(() => instance.validate(), Error(ERR_MISSING_REFRESH_TOKEN))
+
+  const backendInstance = keycloak({
+    backend: true,
+    realm: 'test',
+    url: 'http://localhost:8080',
+    id: 'test-id'
+  })
+
+  is(backendInstance.validate({
+    accessToken: validToken,
+    refreshToken: validToken,
+    idToken: validToken,
+    sessionState: validToken
+  }), true)
+
+  is(backendInstance.validate({
+    accessToken: validToken,
+    refreshToken: invalidToken,
+    idToken: validToken,
+    sessionState: validToken
+  }), false)
+
+  throws(() => backendInstance.validate(), Error(ERR_MISSING_REFRESH_TOKEN))
 })
 
 test('signup', async ({ is, ok, teardown }) => {
@@ -231,7 +335,6 @@ test('signup', async ({ is, ok, teardown }) => {
   ok(result.sessionState)
   server.close()
 })
-
 
 test('signin (interactive)', async ({ is, ok, teardown }) => {
   const server = createServer()
@@ -649,7 +752,6 @@ test('backend mode signin validation', async ({ rejects }) => {
     id: 'test-id'
   }).signin(), Error(ERR_BACKEND_SIGNIN))
 })
-
 
 test('invalid response for signin (user, password)', async ({ is, rejects, teardown }) => {
   const invalidResponses = [
