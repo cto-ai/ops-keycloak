@@ -21,6 +21,10 @@ const ERR_INVALID_RESPONSE = module.exports.ERR_INVALID_RESPONSE = 'Invalid resp
 const ERR_MISSING_ACCESS_TOKEN = module.exports.ERR_MISSING_ACCESS_TOKEN = 'Access token is missing'
 const ERR_MISSING_REFRESH_TOKEN = module.exports.ERR_MISSING_REFRESH_TOKEN = 'Refresh token is missing'
 const ERR_MISSING_SESSION_STATE = module.exports.ERR_MISSING_SESSION_STATE = 'Session state is missing'
+const ERR_BACKEND_SIGNIN = module.exports.ERR_BACKEND_SIGNIN = 'Backend mode signin method must be passed user and password'
+const ERR_BACKEND_METHOD_NOT_SUPPORTED = module.exports.ERR_BACKEND_METHOD_NOT_SUPPORTED = (method) => {
+  return `${method} is not supported in backend mode`
+}
 
 class Granter extends Keycloak {
   constructor (config) {
@@ -43,17 +47,12 @@ class Granter extends Keycloak {
 }
 
 function keycloak (opts = {}) {
-  const { pages = {}, realm, url, id } = opts
-
-  for (const page of ['signup', 'signin', 'error']) {
-    if (Buffer.isBuffer(pages[page])) continue
-    throw Error(ERR_PAGE(page))
-  }
-
+  const { pages = {}, realm, url, id, backend = false } = opts
+  
   if (!realm) throw Error(ERR_REALM)
   if (!url) throw Error(ERR_URL)
   if (!id) throw Error(ERR_ID)
-
+  
   const config = {
     realm,
     'auth-server-url': url,
@@ -71,6 +70,24 @@ function keycloak (opts = {}) {
   const resetsUrl = `${url}/realms/${realm}/login-actions/reset-credentials`
   const loginsUrl = `${url}/realms/${realm}/protocol/openid-connect/auth`
   const logoutsUrl = `${url}/realms/${realm}/protocol/openid-connect/logout`
+
+  if (backend) {
+    return {
+      refresh, 
+      signout,
+      async signin ({ user, password } = {}) {
+        if (!user || !password) throw Error(ERR_BACKEND_SIGNIN)
+        return signin({user, password})
+      },
+      async signup () { throw Error(ERR_BACKEND_METHOD_NOT_SUPPORTED('signup')) },
+      reset () { throw Error(ERR_BACKEND_METHOD_NOT_SUPPORTED('reset')) },
+    }
+  }
+
+  for (const page of ['signup', 'signin', 'error']) {
+    if (Buffer.isBuffer(pages[page])) continue
+    throw Error(ERR_PAGE(page))
+  }
 
   async function auth (navTo, page) {
     const server = createServer()

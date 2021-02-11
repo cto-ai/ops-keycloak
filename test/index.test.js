@@ -20,7 +20,9 @@ const {
   ERR_INVALID_RESPONSE,
   ERR_MISSING_ACCESS_TOKEN,
   ERR_MISSING_REFRESH_TOKEN,
-  ERR_MISSING_SESSION_STATE
+  ERR_MISSING_SESSION_STATE,
+  ERR_BACKEND_SIGNIN,
+  ERR_BACKEND_METHOD_NOT_SUPPORTED
 } = keycloak
 
 const certs = async (server) => {
@@ -59,34 +61,69 @@ const requireWithMocks = (module, mocks) => {
 }
 
 test('option validation', async ({ throws, doesNotThrow }) => {
-  throws(() => keycloak(), ERR_PAGE('signup'))
-  throws(() => keycloak({ pages: { signup: 'test' } }), ERR_PAGE('signup'))
+  throws(() => keycloak(), Error(ERR_REALM))
+  throws(() => keycloak({ realm: 'test'}), Error(ERR_URL))
+  throws(() => keycloak({ realm: 'test',  url: 'http://localhost:8080'}), Error(ERR_ID))
+  throws(() => keycloak({ realm: 'test',  url: 'http://localhost:8080', id: 'test'}), Error(ERR_PAGE('signup')))
   throws(() => keycloak({
-    pages: { signup: Buffer.from('test') }
-  }), ERR_PAGE('signin'))
-  throws(() => keycloak({
-    pages: { signup: Buffer.from('test'), signin: 'test' }
-  }), ERR_PAGE('signin'))
-  throws(() => keycloak({
-    pages: { signup: Buffer.from('test'), signin: Buffer.from('test') }
-  }), ERR_PAGE('error'))
-  throws(() => keycloak({
-    pages: { signup: Buffer.from('test'), signin: Buffer.from('test'), error: 'test' }
-  }), ERR_PAGE('error'))
-  throws(() => keycloak({
-    pages: { signup: Buffer.from('test'), signin: Buffer.from('test'), error: Buffer.from('test') }
-  }), ERR_REALM)
-  throws(() => keycloak({
-    pages: { signup: Buffer.from('test'), signin: Buffer.from('test'), error: Buffer.from('test') },
-    realm: 'test'
-  }), ERR_URL)
-  throws(() => keycloak({
-    pages: { signup: Buffer.from('test'), signin: Buffer.from('test'), error: Buffer.from('test') },
+    pages: {},
     realm: 'test',
-    url: 'http://localhost:8080'
-  }), ERR_ID)
+    url: 'http://localhost:8080',
+    id: 'test',
+  }), Error(ERR_PAGE('signup')))
+  throws(() => keycloak({
+    pages: { signup: 'test'  },
+    realm: 'test',
+    url: 'http://localhost:8080',
+    id: 'test',
+  }), Error(ERR_PAGE('signup')))
+  throws(() => keycloak({
+    pages: { signup: Buffer.from('test')},
+    realm: 'test',
+    url: 'http://localhost:8080',
+    id: 'test',
+  }), Error(ERR_PAGE('signin')))
+  throws(() => keycloak({
+    pages: { signup: Buffer.from('test'), signin: 'test' },
+    realm: 'test',
+    url: 'http://localhost:8080',
+    id: 'test',
+  }), Error(ERR_PAGE('signin')))
+  throws(() => keycloak({
+    pages: { signup: Buffer.from('test'), signin: Buffer.from('test') },
+    realm: 'test',
+    url: 'http://localhost:8080',
+    id: 'test',
+  }), Error(ERR_PAGE('error')))
+  throws(() => keycloak({
+    pages: { signup: Buffer.from('test'), signin: Buffer.from('test'), error: 'test' },
+    realm: 'test',
+    url: 'http://localhost:8080',
+    id: 'test',
+  }), Error(ERR_PAGE('error')))
   doesNotThrow(() => keycloak({
     pages: { signup: Buffer.from('test'), signin: Buffer.from('test'), error: Buffer.from('test') },
+    realm: 'test',
+    url: 'http://localhost:8080',
+    id: 'test'
+  }))
+  throws(() => keycloak({
+    backend: true, 
+    url: 'http://localhost:8080',
+    id: 'test'
+  }))
+  throws(() => keycloak({
+    backend: true, 
+    realm: 'test',
+    id: 'test'
+  }))
+  throws(() => keycloak({
+    backend: true, 
+    realm: 'test',
+    url: 'http://localhost:8080'
+  }))
+  doesNotThrow(() => keycloak({
+    backend: true, 
     realm: 'test',
     url: 'http://localhost:8080',
     id: 'test'
@@ -194,6 +231,7 @@ test('signup', async ({ is, ok, teardown }) => {
   ok(result.sessionState)
   server.close()
 })
+
 
 test('signin (interactive)', async ({ is, ok, teardown }) => {
   const server = createServer()
@@ -340,6 +378,47 @@ test('signin (user, password)', async ({ is, teardown }) => {
   server.close()
 })
 
+test('backend mode signin (user, password)', async ({ is, teardown }) => {
+  const server = createServer()
+  teardown(() => server.close())
+  await promisify(server.listen.bind(server))()
+  const service = `http://localhost:${server.address().port}`
+  const transaction = keycloak({
+    backend: true,
+    realm: 'test',
+    url: service,
+    id: 'test-id'
+  }).signin({ user: 'test', password: 'pwtest' })
+
+  const [req, res] = await once(server, 'request')
+  is(req.url, '/realms/test/protocol/openid-connect/token')
+  const { headers } = req
+  is(headers['content-type'], 'application/x-www-form-urlencoded')
+  is(headers['content-length'], '80')
+  const [data] = await once(req, 'data')
+  const body = qs.parse(data.toString())
+  is(body.grant_type, 'password')
+  is(body.username, 'test')
+  is(body.password, 'pwtest')
+  is(body.client_id, 'test-id')
+  is(body.scope, 'openid')
+  res.setHeader('content-type', 'application/json')
+
+  res.end(JSON.stringify({
+    access_token: 'at',
+    refresh_token: 'rt',
+    id_token: 'it',
+    session_state: 'ss'
+  }))
+
+  const result = await transaction
+  is(result.accessToken, 'at')
+  is(result.refreshToken, 'rt')
+  is(result.idToken, 'it')
+  is(result.sessionState, 'ss')
+  server.close()
+})
+
 test('signout input validation', async ({ rejects, teardown }) => {
   await rejects(keycloak({
     pages: {
@@ -348,7 +427,7 @@ test('signout input validation', async ({ rejects, teardown }) => {
     realm: 'test',
     url: 'http://localhost:8080',
     id: 'test-id'
-  }).signout(), ERR_MISSING_ACCESS_TOKEN)
+  }).signout(), Error(ERR_MISSING_ACCESS_TOKEN))
   await rejects(keycloak({
     pages: {
       signup: Buffer.from('signup'), signin: Buffer.from('signin'), error: Buffer.from('error')
@@ -356,7 +435,7 @@ test('signout input validation', async ({ rejects, teardown }) => {
     realm: 'test',
     url: 'http://localhost:8080',
     id: 'test-id'
-  }).signout({ accessToken: 'at' }), ERR_MISSING_REFRESH_TOKEN)
+  }).signout({ accessToken: 'at' }), Error(ERR_MISSING_REFRESH_TOKEN))
 })
 
 test('signout', async ({ is, teardown }) => {
@@ -401,7 +480,7 @@ test('refresh input validation', async ({ rejects, teardown }) => {
     realm: 'test',
     url: 'http://localhost:8080',
     id: 'test-id'
-  }).refresh(), ERR_MISSING_REFRESH_TOKEN)
+  }).refresh(), Error(ERR_MISSING_REFRESH_TOKEN))
   await rejects(keycloak({
     pages: {
       signup: Buffer.from('signup'), signin: Buffer.from('signin'), error: Buffer.from('error')
@@ -409,7 +488,7 @@ test('refresh input validation', async ({ rejects, teardown }) => {
     realm: 'test',
     url: 'http://localhost:8080',
     id: 'test-id'
-  }).refresh({ refreshToken: 'rt' }), ERR_MISSING_SESSION_STATE)
+  }).refresh({ refreshToken: 'rt' }), Error(ERR_MISSING_SESSION_STATE))
 })
 
 test('refresh', async ({ is, teardown }) => {
@@ -544,6 +623,34 @@ test('reset (not signed in)', async ({ is, teardown }) => {
   }
 })
 
+test('backend mode signup', async ({ rejects }) => {
+  await rejects(() => keycloak({
+    backend: true,
+    realm: 'test',
+    url: 'http://localhost:8080',
+    id: 'test-id'
+  }).signup(), Error(ERR_BACKEND_METHOD_NOT_SUPPORTED('signup')))
+})
+
+test('backend mode reset', async ({ throws }) => {
+  await throws(() => keycloak({
+    backend: true,
+    realm: 'test',
+    url: 'http://localhost:8080',
+    id: 'test-id'
+  }).reset(), Error(ERR_BACKEND_METHOD_NOT_SUPPORTED('reset')))
+})
+
+test('backend mode signin validation', async ({ rejects }) => {
+  await rejects(() => keycloak({
+    backend: true,
+    realm: 'test',
+    url: 'http://localhost:8080',
+    id: 'test-id'
+  }).signin(), Error(ERR_BACKEND_SIGNIN))
+})
+
+
 test('invalid response for signin (user, password)', async ({ is, rejects, teardown }) => {
   const invalidResponses = [
     {},
@@ -572,7 +679,7 @@ test('invalid response for signin (user, password)', async ({ is, rejects, teard
       realm: 'test',
       url: service,
       id: 'test-id'
-    }).signin({ user: 'test', password: 'pwtest' }), ERR_INVALID_RESPONSE)
+    }).signin({ user: 'test', password: 'pwtest' }), Error(ERR_INVALID_RESPONSE))
 
     const [req, res] = await once(server, 'request')
     is(req.url, '/realms/test/protocol/openid-connect/token')
@@ -614,7 +721,7 @@ test('invalid response for refresh', async ({ is, rejects, teardown }) => {
       refreshToken: 'rt',
       idToken: 'it',
       sessionState: 'ss'
-    }), ERR_INVALID_RESPONSE)
+    }), Error(ERR_INVALID_RESPONSE))
 
     const [req, res] = await once(server, 'request')
 
