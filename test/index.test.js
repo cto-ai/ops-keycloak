@@ -1,18 +1,15 @@
-
-const fs = require('fs')
-const qs = require('querystring')
-const { join } = require('path')
-const { createServer } = require('http')
-const { once } = require('events')
-const { promisify } = require('util')
-const { test } = require('tap')
-const { when } = require('nonsynchronous')
-const got = require('got')
-const jwt = require('jsonwebtoken')
-const keycloak = require('..')
-const { readFile } = fs.promises
-
-const {
+import fs from 'fs'
+import qs from 'querystring'
+import { fileURLToPath } from 'url'
+import { join, dirname } from 'path'
+import { createServer } from 'http'
+import { once } from 'events'
+import { promisify } from 'util'
+import { test, mockalicious } from 'tapx'
+import { when } from 'nonsynchronous'
+import got from 'got'
+import jwt from 'jsonwebtoken'
+import keycloak, {
   ERR_PAGE,
   ERR_REALM,
   ERR_URL,
@@ -23,7 +20,11 @@ const {
   ERR_MISSING_SESSION_STATE,
   ERR_BACKEND_SIGNIN,
   ERR_BACKEND_METHOD_NOT_SUPPORTED
-} = keycloak
+} from '../index.js'
+const { readFile } = fs.promises
+
+const load = mockalicious(import.meta.url)
+const __dirname = dirname(fileURLToPath(import.meta.url))
 
 const certs = async (server) => {
   const [req, res] = await once(server, 'request')
@@ -49,15 +50,6 @@ const certs = async (server) => {
   }
   res.setHeader('content-type', 'application/json')
   res.end(JSON.stringify(certs))
-}
-const requireWithMocks = (module, mocks) => {
-  for (const id of Object.keys(require.cache)) {
-    delete require.cache[id]
-  }
-  for (const [name, exports] of Object.entries(mocks)) {
-    require.cache[require.resolve(name)] = { exports }
-  }
-  return require(module)
 }
 
 test('option validation', async ({ throws, doesNotThrow }) => {
@@ -241,8 +233,8 @@ test('signup', async ({ is, ok, teardown }) => {
   const service = `http://localhost:${server.address().port}`
   const context = {}
   const until = when()
-  const keycloak = requireWithMocks('..', {
-    open: (url) => {
+  const keycloak = await load('..', {
+    open (url) {
       context.url = url
       until()
     }
@@ -343,13 +335,12 @@ test('signin (interactive)', async ({ is, ok, teardown }) => {
   const service = `http://localhost:${server.address().port}`
   const context = {}
   const until = when()
-  const keycloak = requireWithMocks('..', {
-    open: (url) => {
+  const keycloak = await load('..', {
+    open (url) {
       context.url = url
       until()
     }
   })
-
   const transaction = keycloak({
     pages: {
       signup: Buffer.from('signup'), signin: Buffer.from('signin'), error: Buffer.from('error')
@@ -645,8 +636,8 @@ test('reset (signed in)', async ({ is, teardown }) => {
   const service = `http://localhost:${server.address().port}`
   const context = {}
   const until = when()
-  const keycloak = requireWithMocks('..', {
-    open: (url) => {
+  const keycloak = await load('..', {
+    open (url) {
       context.url = url
       until()
     }
@@ -675,8 +666,8 @@ test('reset (not signed in)', async ({ is, teardown }) => {
     const service = `http://localhost:${server.address().port}`
     const context = {}
     const until = when()
-    const keycloak = requireWithMocks('..', {
-      open: (url) => {
+    const keycloak = await load('..', {
+      open (url) {
         context.url = url
         until()
       }
@@ -703,8 +694,8 @@ test('reset (not signed in)', async ({ is, teardown }) => {
     const service = `http://localhost:${server.address().port}`
     const context = {}
     const until = when()
-    const keycloak = requireWithMocks('..', {
-      open: (url) => {
+    const keycloak = await load('..', {
+      open (url) {
         context.url = url
         until()
       }
@@ -861,8 +852,8 @@ test('invalid response for signup', async ({ is, rejects, teardown }) => {
     const service = `http://localhost:${server.address().port}`
     const context = {}
     const until = when()
-    const keycloak = requireWithMocks('..', {
-      open: (url) => {
+    const keycloak = await load('..', {
+      open (url) {
         context.url = url
         until()
       }
@@ -900,8 +891,8 @@ test('auth server not found responses', async ({ is, rejects, teardown }) => {
   const service = `http://localhost:${server.address().port}`
   const context = {}
   const until = when()
-  const keycloak = requireWithMocks('..', {
-    open: (url) => {
+  const keycloak = await load('..', {
+    open (url) {
       context.url = url
       until()
     }
@@ -985,8 +976,8 @@ test('auth server bad request responses', async ({ is, rejects, teardown }) => {
   const service = `http://localhost:${server.address().port}`
   const context = {}
   const until = when()
-  const keycloak = requireWithMocks('..', {
-    open: (url) => {
+  const keycloak = await load('..', {
+    open (url) {
       context.url = url
       until()
     }
@@ -1072,7 +1063,7 @@ test('auth server bad request responses', async ({ is, rejects, teardown }) => {
 
 test('error propagation and debug error logging', async ({ is, rejects }) => {
   const until = when()
-  const keycloak = requireWithMocks('..', {
+  const keycloak = await load('..', {
     debug () {
       const debugInst = (err) => {
         is(err.message, 'test')

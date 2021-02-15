@@ -6,6 +6,8 @@ Straightforward [Keycloak](https://www.keycloak.org/) integration.
 
 ## API
 
+This is a native ESM module.
+
 ### `keycloak(opts) => instance`
 
 **Options:**

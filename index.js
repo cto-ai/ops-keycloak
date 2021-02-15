@@ -1,30 +1,36 @@
-const qs = require('querystring')
-const { once, on } = require('events')
-const { promisify } = require('util')
-const { createServer } = require('http')
-const Keycloak = require('keycloak-connect')
-const open = require('open')
-const got = require('got')
-const uuid = require('uuid')
-const jwt = require('jsonwebtoken')
-const createDebug = require('debug')
+import qs from 'querystring'
+import { once, on } from 'events'
+import { promisify } from 'util'
+import { createServer } from 'http'
+import Keycloak from 'keycloak-connect'
+import open from 'open'
+import got from 'got'
+import uuid from 'uuid'
+import jwt from 'jsonwebtoken'
+import createDebug from 'debug'
 
 const debug = createDebug('ops:local-config')
 
 const parse = (urlPath) => new URL(`x://${urlPath}`)
 
-module.exports = keycloak
-module.exports.validate = validate
-const ERR_PAGE = module.exports.ERR_PAGE = (page) => `pages.${page} must be a buffer`
-const ERR_REALM = module.exports.ERR_REALM = 'realm is required'
-const ERR_URL = module.exports.ERR_URL = 'url is required'
-const ERR_ID = module.exports.ERR_ID = 'id is required'
-const ERR_INVALID_RESPONSE = module.exports.ERR_INVALID_RESPONSE = 'Invalid response from keycloak server'
-const ERR_MISSING_ACCESS_TOKEN = module.exports.ERR_MISSING_ACCESS_TOKEN = 'Access token is missing'
-const ERR_MISSING_REFRESH_TOKEN = module.exports.ERR_MISSING_REFRESH_TOKEN = 'Refresh token is missing'
-const ERR_MISSING_SESSION_STATE = module.exports.ERR_MISSING_SESSION_STATE = 'Session state is missing'
-const ERR_BACKEND_SIGNIN = module.exports.ERR_BACKEND_SIGNIN = 'Backend mode signin method must be passed user and password'
-const ERR_BACKEND_METHOD_NOT_SUPPORTED = module.exports.ERR_BACKEND_METHOD_NOT_SUPPORTED = (method) => {
+keycloak.validate = validate
+
+export default keycloak
+export function validate ({ refreshToken } = {}) {
+  if (!refreshToken) throw Error(ERR_MISSING_REFRESH_TOKEN)
+  const { exp } = jwt.decode(refreshToken)
+  return Math.floor(Date.now() / 1000) < exp
+}
+export const ERR_PAGE = (page) => `pages.${page} must be a buffer`
+export const ERR_REALM = 'realm is required'
+export const ERR_URL = 'url is required'
+export const ERR_ID = 'id is required'
+export const ERR_INVALID_RESPONSE = 'Invalid response from keycloak server'
+export const ERR_MISSING_ACCESS_TOKEN = 'Access token is missing'
+export const ERR_MISSING_REFRESH_TOKEN = 'Refresh token is missing'
+export const ERR_MISSING_SESSION_STATE = 'Session state is missing'
+export const ERR_BACKEND_SIGNIN = 'Backend mode signin method must be passed user and password'
+export const ERR_BACKEND_METHOD_NOT_SUPPORTED = (method) => {
   return `${method} is not supported in backend mode`
 }
 
@@ -61,12 +67,6 @@ const dbg = (api) => {
     }
   }
   return api
-}
-
-function validate ({ refreshToken } = {}) {
-  if (!refreshToken) throw Error(ERR_MISSING_REFRESH_TOKEN)
-  const { exp } = jwt.decode(refreshToken)
-  return Math.floor(Date.now() / 1000) < exp
 }
 
 function keycloak (opts = {}) {
@@ -174,6 +174,7 @@ function keycloak (opts = {}) {
         await finish
         return grant
       }
+    /* c8 ignore next */
     } finally {
       server.close()
       await once(server, 'close')
