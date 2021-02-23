@@ -16,7 +16,9 @@ const parse = (urlPath) => new URL(`x://${urlPath}`)
 keycloak.validate = validate
 
 export default keycloak
-export function validate ({ refreshToken } = {}) {
+export function validate ({ accessToken, idToken, refreshToken } = {}) {
+  if (!accessToken) throw Error(ERR_MISSING_ACCESS_TOKEN)
+  if (!idToken) throw Error(ERR_MISSING_ID_TOKEN)
   if (!refreshToken) throw Error(ERR_MISSING_REFRESH_TOKEN)
   const { exp } = jwt.decode(refreshToken)
   return Math.floor(Date.now() / 1000) < exp
@@ -28,6 +30,7 @@ export const ERR_ID = 'id is required'
 export const ERR_INVALID_RESPONSE = 'Invalid response from keycloak server'
 export const ERR_MISSING_ACCESS_TOKEN = 'Access token is missing'
 export const ERR_MISSING_REFRESH_TOKEN = 'Refresh token is missing'
+export const ERR_MISSING_ID_TOKEN = 'Id token is missing'
 export const ERR_MISSING_SESSION_STATE = 'Session state is missing'
 export const ERR_BACKEND_SIGNIN = 'Backend mode signin method must be passed user and password'
 export const ERR_BACKEND_METHOD_NOT_SUPPORTED = (method) => {

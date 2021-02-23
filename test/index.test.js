@@ -17,6 +17,7 @@ import keycloak, {
   ERR_INVALID_RESPONSE,
   ERR_MISSING_ACCESS_TOKEN,
   ERR_MISSING_REFRESH_TOKEN,
+  ERR_MISSING_ID_TOKEN,
   ERR_MISSING_SESSION_STATE,
   ERR_BACKEND_SIGNIN,
   ERR_BACKEND_METHOD_NOT_SUPPORTED
@@ -175,7 +176,9 @@ test('validate', async ({ is, throws }) => {
     sessionState: validToken
   }), false)
 
-  throws(() => keycloak.validate(), Error(ERR_MISSING_REFRESH_TOKEN))
+  throws(() => keycloak.validate(), Error(ERR_MISSING_ACCESS_TOKEN))
+  throws(() => keycloak.validate({ accessToken: validToken }), Error(ERR_MISSING_ID_TOKEN))
+  throws(() => keycloak.validate({ accessToken: validToken, idToken: validToken }), Error(ERR_MISSING_REFRESH_TOKEN))
 
   const instance = keycloak({
     pages: {
@@ -200,7 +203,9 @@ test('validate', async ({ is, throws }) => {
     sessionState: validToken
   }), false)
 
-  throws(() => instance.validate(), Error(ERR_MISSING_REFRESH_TOKEN))
+  throws(() => instance.validate(), Error(ERR_MISSING_ACCESS_TOKEN))
+  throws(() => instance.validate({ accessToken: validToken }), Error(ERR_MISSING_ID_TOKEN))
+  throws(() => instance.validate({ accessToken: validToken, idToken: validToken }), Error(ERR_MISSING_REFRESH_TOKEN))
 
   const backendInstance = keycloak({
     backend: true,
@@ -223,7 +228,9 @@ test('validate', async ({ is, throws }) => {
     sessionState: validToken
   }), false)
 
-  throws(() => backendInstance.validate(), Error(ERR_MISSING_REFRESH_TOKEN))
+  throws(() => backendInstance.validate(), Error(ERR_MISSING_ACCESS_TOKEN))
+  throws(() => backendInstance.validate({ accessToken: validToken }), Error(ERR_MISSING_ID_TOKEN))
+  throws(() => backendInstance.validate({ accessToken: validToken, idToken: validToken }), Error(ERR_MISSING_REFRESH_TOKEN))
 })
 
 test('signup', async ({ is, ok, teardown }) => {
