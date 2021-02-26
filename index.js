@@ -1,6 +1,5 @@
 import qs from 'querystring'
 import { once, on } from 'events'
-import { promisify } from 'util'
 import { createServer } from 'http'
 import Keycloak from 'keycloak-connect'
 import open from 'open'
@@ -14,6 +13,7 @@ const debug = createDebug('ops:local-config')
 const parse = (urlPath) => new URL(`x://${urlPath}`)
 
 keycloak.validate = validate
+keycloak.identity = identity
 
 export default keycloak
 export function validate ({ accessToken, idToken, refreshToken } = {}) {
@@ -23,6 +23,16 @@ export function validate ({ accessToken, idToken, refreshToken } = {}) {
   const { exp } = jwt.decode(refreshToken)
   return Math.floor(Date.now() / 1000) < exp
 }
+export function identity ({ idToken } = {}) {
+  if (!idToken) throw Error(ERR_MISSING_ID_TOKEN)
+  const info = jwt.decode(idToken)
+  return {
+    id: info.sub,
+    username: info.preferred_username,
+    email: info.email
+  }
+}
+export const ERR_NO_PORTS = 'None of keycloaks allowed ports can be bound to'
 export const ERR_PAGE = (page) => `pages.${page} must be a buffer`
 export const ERR_REALM = 'realm is required'
 export const ERR_URL = 'url is required'
@@ -72,9 +82,7 @@ const dbg = (api) => {
   return api
 }
 
-function keycloak (opts = {}) {
-  const { pages = {}, realm, url, id, backend = false } = opts
-
+function keycloak ({ pages = {}, realm, url, id, backend = false } = {}) {
   if (!realm) throw Error(ERR_REALM)
   if (!url) throw Error(ERR_URL)
   if (!id) throw Error(ERR_ID)
@@ -106,6 +114,7 @@ function keycloak (opts = {}) {
         return signin({ user, password })
       },
       validate,
+      identity,
       async signup () { throw Error(ERR_BACKEND_METHOD_NOT_SUPPORTED('signup')) },
       reset () { throw Error(ERR_BACKEND_METHOD_NOT_SUPPORTED('reset')) }
     })
@@ -118,7 +127,14 @@ function keycloak (opts = {}) {
 
   async function auth (navTo, page) {
     const server = createServer()
-    await promisify(server.listen.bind(server))()
+    const ports = [10234, 28751, 38179, 41976, 49164]
+    while (true) {
+      server.listen(ports.shift())
+      const [err] = await Promise.race([once(server, 'error'), once(server, 'listening')])
+      if (!err) break
+      if (ports.length === 0) throw Error(ERR_NO_PORTS)
+    }
+
     try {
       const { port } = server.address()
       const redir = `http://localhost:${port}${endpoint}`
@@ -279,6 +295,6 @@ function keycloak (opts = {}) {
   }
 
   return dbg({
-    signup, signin, signout, validate, refresh, reset
+    signup, signin, signout, validate, identity, refresh, reset
   })
 }

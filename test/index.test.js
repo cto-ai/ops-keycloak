@@ -10,6 +10,7 @@ import { when } from 'nonsynchronous'
 import got from 'got'
 import jwt from 'jsonwebtoken'
 import keycloak, {
+  ERR_NO_PORTS,
   ERR_PAGE,
   ERR_REALM,
   ERR_URL,
@@ -1094,4 +1095,76 @@ test('error propagation and debug error logging', async ({ is, rejects }) => {
   }).signup())
   await until.done()
   await transaction
+})
+
+test('rejects when all allowed redirect ports are unavailable', async ({ rejects, teardown }) => {
+  const ports = [10234, 28751, 38179, 41976, 49164]
+  const servers = ports.map((port) => createServer().listen(port))
+  const server = createServer()
+  teardown(() => {
+    for (const server of servers) { server.close() }
+    server.close()
+  })
+  await promisify(server.listen.bind(server))()
+  const service = `http://localhost:${server.address().port}`
+  const keycloak = await load('..', { open () {} })
+
+  await rejects(keycloak({
+    pages: {
+      signup: Buffer.from('signup'), signin: Buffer.from('signin'), error: Buffer.from('error')
+    },
+    realm: 'test',
+    url: service,
+    id: 'test-id'
+  }).signup(), Error(ERR_NO_PORTS))
+})
+
+test('identity', async ({ same, is, throws }) => {
+  const sig = await readFile(join(__dirname, 'fixtures', 'private.pem'))
+  const idToken = jwt.sign({
+    jti: 'ea5f888e-61dc-4369-a910-95617e12a5c1',
+    nbf: 0,
+    iss: 'http://localhost:8080/realms/test',
+    sub: 'd7b55810-239b-4837-bd4d-125a40c9a1fc',
+    typ: 'Bearer',
+    azp: 'test-id',
+    nonce: 'b2c82b30-6b3a-11eb-aefb-db0eadc96f2e',
+    session_state: '45cdc1df-f8eb-4470-864d-235196ec09c6',
+    acr: '1',
+    scope: 'openid email profile',
+    email_verified: false,
+    name: 'test test',
+    preferred_username: 'test',
+    given_name: 'test',
+    family_name: 'test',
+    email: 'test@test.com'
+  }, sig, { algorithm: 'RS256', expiresIn: 2592000, header: { kid: 'testkid' } })
+
+  throws(() => keycloak.identity(), Error(ERR_MISSING_ID_TOKEN))
+
+  same(keycloak.identity({ idToken }), {
+    id: 'd7b55810-239b-4837-bd4d-125a40c9a1fc',
+    username: 'test',
+    email: 'test@test.com'
+  })
+
+  const instance = keycloak({
+    pages: {
+      signup: Buffer.from('signup'), signin: Buffer.from('signin'), error: Buffer.from('error')
+    },
+    realm: 'test',
+    url: 'http://localhost:8080',
+    id: 'test-id'
+  })
+
+  is(instance.identity, keycloak.identity)
+
+  const backendInstance = keycloak({
+    backend: true,
+    realm: 'test',
+    url: 'http://localhost:8080',
+    id: 'test-id'
+  })
+
+  is(backendInstance.identity, keycloak.identity)
 })
