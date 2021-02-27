@@ -254,7 +254,8 @@ test('exposes endpoints', async ({ same }) => {
       registrations: 'http://localhost:9999/realms/test/protocol/openid-connect/registrations',
       resets: 'http://localhost:9999/realms/test/login-actions/reset-credentials',
       logins: 'http://localhost:9999/realms/test/protocol/openid-connect/auth',
-      logouts: 'http://localhost:9999/realms/test/protocol/openid-connect/logout'
+      logouts: 'http://localhost:9999/realms/test/protocol/openid-connect/logout',
+      last: null
     })
   }
 
@@ -275,7 +276,8 @@ test('exposes endpoints', async ({ same }) => {
       registrations: 'http://localhost:9999/realms/test/protocol/openid-connect/registrations',
       resets: 'http://localhost:9999/realms/test/login-actions/reset-credentials',
       logins: 'http://localhost:9999/realms/test/protocol/openid-connect/auth',
-      logouts: 'http://localhost:9999/realms/test/protocol/openid-connect/logout'
+      logouts: 'http://localhost:9999/realms/test/protocol/openid-connect/logout',
+      last: null
     })
   }
 })

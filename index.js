@@ -105,7 +105,8 @@ function keycloak ({ pages = {}, realm, url, id, backend = false } = {}) {
     registrations: `${url}/realms/${realm}/protocol/openid-connect/registrations`,
     resets: `${url}/realms/${realm}/login-actions/reset-credentials`,
     logins: `${url}/realms/${realm}/protocol/openid-connect/auth`,
-    logouts: `${url}/realms/${realm}/protocol/openid-connect/logout`
+    logouts: `${url}/realms/${realm}/protocol/openid-connect/logout`,
+    last: null
   }
 
   if (backend) {
@@ -149,7 +150,7 @@ function keycloak ({ pages = {}, realm, url, id, backend = false } = {}) {
         nonce: uuid(),
         state: uuid()
       })
-      open(`${navTo}?${params}`)
+      open(endpoints.last = `${navTo}?${params}`)
       for await (const [req, res] of on(server, 'request')) {
         if (req.method !== 'GET') {
           res.statusCode = 400
@@ -294,7 +295,7 @@ function keycloak ({ pages = {}, realm, url, id, backend = false } = {}) {
 
   function reset (opts = {}) {
     const { signedIn = false } = opts
-    open(signedIn ? endpoints.passwords : endpoints.resets)
+    open(endpoints.last = (signedIn ? endpoints.passwords : endpoints.resets))
   }
 
   return dbg({
