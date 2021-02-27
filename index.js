@@ -1,4 +1,5 @@
 import qs from 'querystring'
+import { PassThrough } from 'stream'
 import { once, on } from 'events'
 import { createServer } from 'http'
 import Keycloak from 'keycloak-connect'
@@ -99,15 +100,16 @@ function keycloak ({ pages = {}, realm, url, id, backend = false } = {}) {
   const granter = new Granter(config)
   const endpoint = '/callback'
 
-  const endpoints = {
-    tokens: `${url}/realms/${realm}/protocol/openid-connect/token`,
-    passwords: `${url}/realms/${realm}/account/password`,
-    registrations: `${url}/realms/${realm}/protocol/openid-connect/registrations`,
-    resets: `${url}/realms/${realm}/login-actions/reset-credentials`,
-    logins: `${url}/realms/${realm}/protocol/openid-connect/auth`,
-    logouts: `${url}/realms/${realm}/protocol/openid-connect/logout`,
-    last: null
-  }
+  const urlStream = new PassThrough()
+  /* c8 ignore next */
+  async function * urls () { yield * urlStream }
+  const endpoints = urls()
+  endpoints.tokens = `${url}/realms/${realm}/protocol/openid-connect/token`
+  endpoints.passwords = `${url}/realms/${realm}/account/password`
+  endpoints.registrations = `${url}/realms/${realm}/protocol/openid-connect/registrations`
+  endpoints.resets = `${url}/realms/${realm}/login-actions/reset-credentials`
+  endpoints.logins = `${url}/realms/${realm}/protocol/openid-connect/auth`
+  endpoints.logouts = `${url}/realms/${realm}/protocol/openid-connect/logout`
 
   if (backend) {
     return dbg({
@@ -150,7 +152,9 @@ function keycloak ({ pages = {}, realm, url, id, backend = false } = {}) {
         nonce: uuid(),
         state: uuid()
       })
-      open(endpoints.last = `${navTo}?${params}`)
+      const to = `${navTo}?${params}`
+      urlStream.push(to)
+      open(to)
       for await (const [req, res] of on(server, 'request')) {
         if (req.method !== 'GET') {
           res.statusCode = 400
@@ -295,7 +299,9 @@ function keycloak ({ pages = {}, realm, url, id, backend = false } = {}) {
 
   function reset (opts = {}) {
     const { signedIn = false } = opts
-    open(endpoints.last = (signedIn ? endpoints.passwords : endpoints.resets))
+    const to = signedIn ? endpoints.passwords : endpoints.resets
+    urlStream.push(to)
+    open(to)
   }
 
   return dbg({
