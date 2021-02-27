@@ -67,8 +67,8 @@ class Granter extends Keycloak {
   }
 }
 
-const dbg = (api) => {
-  if (debug.enabled === false) return api
+const dbg = (api, extra) => {
+  if (debug.enabled === false) return { ...api, ...extra }
   for (const [k, fn] of Object.entries(api)) {
     api[k] = async (...args) => {
       try {
@@ -79,7 +79,7 @@ const dbg = (api) => {
       }
     }
   }
-  return api
+  return { ...api, ...extra }
 }
 
 function keycloak ({ pages = {}, realm, url, id, backend = false } = {}) {
@@ -98,12 +98,15 @@ function keycloak ({ pages = {}, realm, url, id, backend = false } = {}) {
 
   const granter = new Granter(config)
   const endpoint = '/callback'
-  const tokensUrl = `${url}/realms/${realm}/protocol/openid-connect/token`
-  const passwordsUrl = `${url}/realms/${realm}/account/password`
-  const registrationsUrl = `${url}/realms/${realm}/protocol/openid-connect/registrations`
-  const resetsUrl = `${url}/realms/${realm}/login-actions/reset-credentials`
-  const loginsUrl = `${url}/realms/${realm}/protocol/openid-connect/auth`
-  const logoutsUrl = `${url}/realms/${realm}/protocol/openid-connect/logout`
+
+  const endpoints = {
+    tokens: `${url}/realms/${realm}/protocol/openid-connect/token`,
+    passwords: `${url}/realms/${realm}/account/password`,
+    registrations: `${url}/realms/${realm}/protocol/openid-connect/registrations`,
+    resets: `${url}/realms/${realm}/login-actions/reset-credentials`,
+    logins: `${url}/realms/${realm}/protocol/openid-connect/auth`,
+    logouts: `${url}/realms/${realm}/protocol/openid-connect/logout`
+  }
 
   if (backend) {
     return dbg({
@@ -117,7 +120,7 @@ function keycloak ({ pages = {}, realm, url, id, backend = false } = {}) {
       identity,
       async signup () { throw Error(ERR_BACKEND_METHOD_NOT_SUPPORTED('signup')) },
       reset () { throw Error(ERR_BACKEND_METHOD_NOT_SUPPORTED('reset')) }
-    })
+    }, { endpoints })
   }
 
   for (const page of ['signup', 'signin', 'error']) {
@@ -173,7 +176,7 @@ function keycloak ({ pages = {}, realm, url, id, backend = false } = {}) {
           client_id: id,
           redirect_uri: redir
         })
-        const result = await got.post(tokensUrl, {
+        const result = await got.post(endpoints.tokens, {
           headers: {
             'Content-Type': 'application/x-www-form-urlencoded',
             'Content-Length': data.length
@@ -201,14 +204,14 @@ function keycloak ({ pages = {}, realm, url, id, backend = false } = {}) {
   }
 
   async function signup () {
-    const tokens = await auth(registrationsUrl, pages.signup)
+    const tokens = await auth(endpoints.registrations, pages.signup)
     return tokens
   }
 
   async function signin ({ user, password } = {}) {
     const interactive = !user || !password
     if (interactive) {
-      const tokens = await auth(loginsUrl, pages.signin)
+      const tokens = await auth(endpoints.logins, pages.signin)
       return tokens
     }
     debug('getting token from password grant')
@@ -219,7 +222,7 @@ function keycloak ({ pages = {}, realm, url, id, backend = false } = {}) {
       password,
       scope: 'openid'
     })
-    const result = await got.post(tokensUrl, {
+    const result = await got.post(endpoints.tokens, {
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',
         'Content-Length': data.length
@@ -249,7 +252,7 @@ function keycloak ({ pages = {}, realm, url, id, backend = false } = {}) {
       client_id: id,
       refresh_token: refreshToken
     })
-    const result = await got.post(tokensUrl, {
+    const result = await got.post(endpoints.tokens, {
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',
         'Content-Length': data.length
@@ -279,7 +282,7 @@ function keycloak ({ pages = {}, realm, url, id, backend = false } = {}) {
       client_id: id,
       refresh_token: refreshToken
     })
-    await got.post(logoutsUrl, {
+    await got.post(endpoints.logouts, {
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',
         Authorization: accessToken,
@@ -291,10 +294,10 @@ function keycloak ({ pages = {}, realm, url, id, backend = false } = {}) {
 
   function reset (opts = {}) {
     const { signedIn = false } = opts
-    open(signedIn ? passwordsUrl : resetsUrl)
+    open(signedIn ? endpoints.passwords : endpoints.resets)
   }
 
   return dbg({
     signup, signin, signout, validate, identity, refresh, reset
-  })
+  }, { endpoints })
 }

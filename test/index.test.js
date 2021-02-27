@@ -234,6 +234,52 @@ test('validate', async ({ is, throws }) => {
   throws(() => backendInstance.validate({ accessToken: validToken, idToken: validToken }), Error(ERR_MISSING_REFRESH_TOKEN))
 })
 
+test('exposes endpoints', async ({ same }) => {
+  const service = 'http://localhost:9999'
+  const keycloak = await load('..', { open () {} })
+
+  {
+    const { endpoints } = keycloak({
+      pages: {
+        signup: Buffer.from('signup'), signin: Buffer.from('signin'), error: Buffer.from('error')
+      },
+      realm: 'test',
+      url: service,
+      id: 'test-id'
+    })
+
+    same(endpoints, {
+      tokens: 'http://localhost:9999/realms/test/protocol/openid-connect/token',
+      passwords: 'http://localhost:9999/realms/test/account/password',
+      registrations: 'http://localhost:9999/realms/test/protocol/openid-connect/registrations',
+      resets: 'http://localhost:9999/realms/test/login-actions/reset-credentials',
+      logins: 'http://localhost:9999/realms/test/protocol/openid-connect/auth',
+      logouts: 'http://localhost:9999/realms/test/protocol/openid-connect/logout'
+    })
+  }
+
+  {
+    const { endpoints } = keycloak({
+      pages: {
+        signup: Buffer.from('signup'), signin: Buffer.from('signin'), error: Buffer.from('error')
+      },
+      realm: 'test',
+      url: service,
+      id: 'test-id',
+      backend: true
+    })
+
+    same(endpoints, {
+      tokens: 'http://localhost:9999/realms/test/protocol/openid-connect/token',
+      passwords: 'http://localhost:9999/realms/test/account/password',
+      registrations: 'http://localhost:9999/realms/test/protocol/openid-connect/registrations',
+      resets: 'http://localhost:9999/realms/test/login-actions/reset-credentials',
+      logins: 'http://localhost:9999/realms/test/protocol/openid-connect/auth',
+      logouts: 'http://localhost:9999/realms/test/protocol/openid-connect/logout'
+    })
+  }
+})
+
 test('signup', async ({ is, ok, teardown }) => {
   const server = createServer()
   teardown(() => server.close())
