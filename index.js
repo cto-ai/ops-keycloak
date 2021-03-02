@@ -47,7 +47,7 @@ export const ERR_BACKEND_SIGNIN = 'Backend mode signin method must be passed use
 export const ERR_BACKEND_METHOD_NOT_SUPPORTED = (method) => {
   return `${method} is not supported in backend mode`
 }
-const ERR_UNAUTHORIZED = (description) => description
+export const ERR_UNAUTHORIZED = (description = 'Unauthorized') => description
 
 class Granter extends Keycloak {
   constructor (config) {
@@ -111,6 +111,7 @@ function keycloak ({ pages = {}, realm, url, id, backend = false } = {}) {
   endpoints.resets = `${url}/realms/${realm}/login-actions/reset-credentials`
   endpoints.logins = `${url}/realms/${realm}/protocol/openid-connect/auth`
   endpoints.logouts = `${url}/realms/${realm}/protocol/openid-connect/logout`
+  endpoints.teams = `${url}/private/teams`
 
   if (backend) {
     return dbg({
@@ -122,6 +123,7 @@ function keycloak ({ pages = {}, realm, url, id, backend = false } = {}) {
       },
       validate,
       identity,
+      teams,
       async signup () { throw Error(ERR_BACKEND_METHOD_NOT_SUPPORTED('signup')) },
       reset () { throw Error(ERR_BACKEND_METHOD_NOT_SUPPORTED('reset')) }
     }, { endpoints })
@@ -221,30 +223,39 @@ function keycloak ({ pages = {}, realm, url, id, backend = false } = {}) {
       return tokens
     }
     debug('getting token from password grant')
-    const data = qs.stringify({
-      grant_type: 'password',
-      client_id: id,
-      username: user,
-      password,
-      scope: 'openid'
-    })
-    const result = await got.post(endpoints.tokens, {
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-        'Content-Length': data.length
-      },
-      body: data
-    }).json()
+    try {
+      const data = qs.stringify({
+        grant_type: 'password',
+        client_id: id,
+        username: user,
+        password,
+        scope: 'openid'
+      })
+      const result = await got.post(endpoints.tokens, {
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'Content-Length': data.length
+        },
+        body: data
+      }).json()
 
-    if (!result.access_token || !result.refresh_token || !result.id_token || !result.session_state) {
-      throw Error(ERR_INVALID_RESPONSE)
-    }
+      if (!result.access_token || !result.refresh_token || !result.id_token || !result.session_state) {
+        throw Error(ERR_INVALID_RESPONSE)
+      }
 
-    return {
-      accessToken: result.access_token,
-      refreshToken: result.refresh_token,
-      idToken: result.id_token,
-      sessionState: result.session_state
+      return {
+        accessToken: result.access_token,
+        refreshToken: result.refresh_token,
+        idToken: result.id_token,
+        sessionState: result.session_state
+      }
+    } catch (err) {
+      if (err && err.response && err.response.statusCode === 401) {
+        const err = Error(ERR_UNAUTHORIZED())
+        err.code = 'ERR_UNAUTHORIZED'
+        throw err
+      }
+      throw err
     }
   }
 
@@ -311,6 +322,24 @@ function keycloak ({ pages = {}, realm, url, id, backend = false } = {}) {
     }).json()
   }
 
+  async function teams (tokens) {
+    try {
+      const { id } = identity(tokens)
+      const response = await got(`${endpoints.teams}?userId=${id}`, {
+        headers: { Authorization: tokens.accessToken }
+      }).json()
+      if (response.error) throw Error(response.error)
+      return response.data
+    } catch (err) {
+      if (err && err.response && err.response.statusCode === 401) {
+        const err = Error(ERR_UNAUTHORIZED())
+        err.code = 'ERR_UNAUTHORIZED'
+        throw err
+      }
+      throw err
+    }
+  }
+
   function reset (opts = {}) {
     const { signedIn = false } = opts
     const to = signedIn ? endpoints.passwords : endpoints.resets
@@ -319,6 +348,6 @@ function keycloak ({ pages = {}, realm, url, id, backend = false } = {}) {
   }
 
   return dbg({
-    signup, signin, signout, validate, identity, refresh, reset
+    signup, signin, signout, validate, identity, refresh, reset, teams
   }, { endpoints })
 }

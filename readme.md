@@ -63,14 +63,30 @@ Will open a browser at a Keycloak password reset URL, which differs based on the
 
 * `signedIn` (`boolean`), Default: `false` - If `true` the browser will open to the logged-in accounts password page. If `false` it will open to reset credentials page.
 
+### `instance.teams(tokens) => Promise => [teams]`
+
+Returns a promise that resolves the teams for the user that the tokens belong to.
+
+
 ### `instance.validate(tokens) => boolean`
 
 See [`keycloak.validate`](#keycloak-validate)
+
+### `instance.identity(tokens) => { id, username, email }`
+
+See [`keycloak.identity`](#keycloak-identity)
 
 
 ### `keycloak.validate(tokens) => boolean`
 
 Checks whether `tokens.refreshToken` has expired. If it has `validate` returns `true`, otherwise `false`.
+
+If any tokens are missing from the `tokens` object, this function will throw.
+
+
+### `keycloak.identity(tokens) => { id, username, email }`
+
+Decodes `tokens.idToken` and returns an object with a users `id`, `username` and `email`.
 
 
 ## Caveats
