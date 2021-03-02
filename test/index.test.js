@@ -620,7 +620,7 @@ test('signout', async ({ is, teardown }) => {
   server.close()
 })
 
-test('refresh input validation', async ({ rejects, teardown }) => {
+test('refresh input validation', async ({ rejects }) => {
   await rejects(keycloak({
     pages: {
       signup: Buffer.from('signup'), signin: Buffer.from('signin'), error: Buffer.from('error')
@@ -680,6 +680,82 @@ test('refresh', async ({ is, teardown }) => {
   is(result.refreshToken, 'nrt')
   is(result.idToken, 'nit')
   is(result.sessionState, 'ss')
+  server.close()
+})
+
+test('refresh invalid grant', async ({ is, teardown, rejects }) => {
+  const server = createServer()
+  teardown(() => server.close())
+  await promisify(server.listen.bind(server))()
+  const service = `http://localhost:${server.address().port}`
+  const transaction = keycloak({
+    pages: {
+      signup: Buffer.from('signup'), signin: Buffer.from('signin'), error: Buffer.from('error')
+    },
+    realm: 'test',
+    url: service,
+    id: 'test-id'
+  }).refresh({
+    accessToken: 'at',
+    refreshToken: 'rt',
+    idToken: 'it',
+    sessionState: 'ss'
+  })
+
+  const [req, res] = await once(server, 'request')
+  is(req.url, '/realms/test/protocol/openid-connect/token')
+  const { headers } = req
+  is(headers['content-type'], 'application/x-www-form-urlencoded')
+  is(headers['content-length'], '59')
+  const [data] = await once(req, 'data')
+  const body = qs.parse(data.toString())
+  is(body.grant_type, 'refresh_token')
+  is(body.client_id, 'test-id')
+  is(body.refresh_token, 'rt')
+  res.statusCode = 400
+  res.end(JSON.stringify({
+    error: 'invalid_grant',
+    error_description: 'Refresh token is invalid.'
+  }))
+  await rejects(transaction, {
+    message: 'Refresh token is invalid.',
+    code: 'ERR_UNAUTHORIZED'
+  })
+  server.close()
+})
+
+test('refresh invalid grant with corrupt body', async ({ is, teardown, rejects }) => {
+  const server = createServer()
+  teardown(() => server.close())
+  await promisify(server.listen.bind(server))()
+  const service = `http://localhost:${server.address().port}`
+  const transaction = keycloak({
+    pages: {
+      signup: Buffer.from('signup'), signin: Buffer.from('signin'), error: Buffer.from('error')
+    },
+    realm: 'test',
+    url: service,
+    id: 'test-id'
+  }).refresh({
+    accessToken: 'at',
+    refreshToken: 'rt',
+    idToken: 'it',
+    sessionState: 'ss'
+  })
+
+  const [req, res] = await once(server, 'request')
+  is(req.url, '/realms/test/protocol/openid-connect/token')
+  const { headers } = req
+  is(headers['content-type'], 'application/x-www-form-urlencoded')
+  is(headers['content-length'], '59')
+  const [data] = await once(req, 'data')
+  const body = qs.parse(data.toString())
+  is(body.grant_type, 'refresh_token')
+  is(body.client_id, 'test-id')
+  is(body.refresh_token, 'rt')
+  res.statusCode = 400
+  res.end('not some json')
+  await rejects(transaction)
   server.close()
 })
 

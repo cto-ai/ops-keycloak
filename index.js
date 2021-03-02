@@ -47,6 +47,7 @@ export const ERR_BACKEND_SIGNIN = 'Backend mode signin method must be passed use
 export const ERR_BACKEND_METHOD_NOT_SUPPORTED = (method) => {
   return `${method} is not supported in backend mode`
 }
+const ERR_UNAUTHORIZED = (description) => description
 
 class Granter extends Keycloak {
   constructor (config) {
@@ -257,25 +258,38 @@ function keycloak ({ pages = {}, realm, url, id, backend = false } = {}) {
       client_id: id,
       refresh_token: refreshToken
     })
-    const result = await got.post(endpoints.tokens, {
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-        'Content-Length': data.length
-      },
-      body: data
-    }).json()
+    try {
+      const result = await got.post(endpoints.tokens, {
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'Content-Length': data.length
+        },
+        body: data
+      }).json()
 
-    if (!result.access_token || !result.refresh_token || !result.id_token) {
-      throw Error(ERR_INVALID_RESPONSE)
-    }
+      if (!result.access_token || !result.refresh_token || !result.id_token) {
+        throw Error(ERR_INVALID_RESPONSE)
+      }
 
-    debug('Successfully refreshed access token')
+      debug('Successfully refreshed access token')
 
-    return {
-      accessToken: result.access_token,
-      refreshToken: result.refresh_token,
-      idToken: result.id_token,
-      sessionState: sessionState
+      return {
+        accessToken: result.access_token,
+        refreshToken: result.refresh_token,
+        idToken: result.id_token,
+        sessionState: sessionState
+      }
+    } catch (err) {
+      if (err.response && err.response.body) {
+        let body = null
+        try { body = JSON.parse(err.response.body) } catch {}
+        if (body && body.error === 'invalid_grant') {
+          const err = Error(ERR_UNAUTHORIZED(body.error_description))
+          err.code = 'ERR_UNAUTHORIZED'
+          throw err
+        }
+      }
+      throw err
     }
   }
 
