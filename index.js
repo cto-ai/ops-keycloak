@@ -111,7 +111,6 @@ function keycloak ({ pages = {}, realm, url, id, backend = false } = {}) {
   endpoints.resets = `${url}/realms/${realm}/login-actions/reset-credentials`
   endpoints.logins = `${url}/realms/${realm}/protocol/openid-connect/auth`
   endpoints.logouts = `${url}/realms/${realm}/protocol/openid-connect/logout`
-  endpoints.teams = `${url}/private/teams`
 
   if (backend) {
     return dbg({
@@ -123,7 +122,6 @@ function keycloak ({ pages = {}, realm, url, id, backend = false } = {}) {
       },
       validate,
       identity,
-      teams,
       async signup () { throw Error(ERR_BACKEND_METHOD_NOT_SUPPORTED('signup')) },
       reset () { throw Error(ERR_BACKEND_METHOD_NOT_SUPPORTED('reset')) }
     }, { endpoints })
@@ -322,24 +320,6 @@ function keycloak ({ pages = {}, realm, url, id, backend = false } = {}) {
     }).json()
   }
 
-  async function teams (tokens) {
-    try {
-      const { id } = identity(tokens)
-      const response = await got(`${endpoints.teams}?userId=${id}`, {
-        headers: { Authorization: tokens.accessToken }
-      }).json()
-      if (response.error) throw Error(response.error)
-      return response.data
-    } catch (err) {
-      if (err && err.response && err.response.statusCode === 401) {
-        const err = Error(ERR_UNAUTHORIZED())
-        err.code = 'ERR_UNAUTHORIZED'
-        throw err
-      }
-      throw err
-    }
-  }
-
   function reset (opts = {}) {
     const { signedIn = false } = opts
     const to = signedIn ? endpoints.passwords : endpoints.resets
@@ -348,6 +328,6 @@ function keycloak ({ pages = {}, realm, url, id, backend = false } = {}) {
   }
 
   return dbg({
-    signup, signin, signout, validate, identity, refresh, reset, teams
+    signup, signin, signout, validate, identity, refresh, reset
   }, { endpoints })
 }

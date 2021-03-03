@@ -254,8 +254,7 @@ test('exposes endpoints', async ({ same }) => {
       registrations: 'http://localhost:9999/realms/test/protocol/openid-connect/registrations',
       resets: 'http://localhost:9999/realms/test/login-actions/reset-credentials',
       logins: 'http://localhost:9999/realms/test/protocol/openid-connect/auth',
-      logouts: 'http://localhost:9999/realms/test/protocol/openid-connect/logout',
-      teams: 'http://localhost:9999/private/teams'
+      logouts: 'http://localhost:9999/realms/test/protocol/openid-connect/logout'
     })
   }
 
@@ -276,8 +275,7 @@ test('exposes endpoints', async ({ same }) => {
       registrations: 'http://localhost:9999/realms/test/protocol/openid-connect/registrations',
       resets: 'http://localhost:9999/realms/test/login-actions/reset-credentials',
       logins: 'http://localhost:9999/realms/test/protocol/openid-connect/auth',
-      logouts: 'http://localhost:9999/realms/test/protocol/openid-connect/logout',
-      teams: 'http://localhost:9999/private/teams'
+      logouts: 'http://localhost:9999/realms/test/protocol/openid-connect/logout'
     })
   }
 })
@@ -920,176 +918,6 @@ test('reset (not signed in)', async ({ is, teardown }) => {
     await transaction
     server.close()
   }
-})
-
-test('teams', async ({ is, same, teardown }) => {
-  const server = createServer()
-  teardown(() => server.close())
-  await promisify(server.listen.bind(server))()
-  const service = `http://localhost:${server.address().port}`
-
-  const sig = await readFile(join(__dirname, 'fixtures', 'private.pem'))
-
-  const transaction = keycloak({
-    pages: {
-      signup: Buffer.from('signup'), signin: Buffer.from('signin'), error: Buffer.from('error')
-    },
-    realm: 'test',
-    url: service,
-    id: 'test-id'
-  }).teams({
-    accessToken: 'at',
-    refreshToken: 'rt',
-    idToken: jwt.sign({
-      jti: 'db34922c-b52e-47b7-8b54-d6a2e8afbc1f',
-      nbf: 0,
-      iss: `${service}/realms/test`,
-      sub: 'd7b55810-239b-4837-bd4d-125a40c9a1fc',
-      typ: 'ID',
-      azp: 'test-id',
-      aud: 'test-id',
-      nonce: 'b2c82b30-6b3a-11eb-aefb-db0eadc96f2e',
-      session_state: '45cdc1df-f8eb-4470-864d-235196ec09c6',
-      acr: '1',
-      email_verified: false,
-      name: 'test test',
-      preferred_username: 'test',
-      given_name: 'test',
-      family_name: 'test',
-      email: 'test@test.com'
-    }, sig, { algorithm: 'RS256', expiresIn: 2592000, header: { kid: 'testkid' } }),
-    sessionState: 'ss'
-  })
-
-  const [req, res] = await once(server, 'request')
-  is(req.url, '/private/teams?userId=d7b55810-239b-4837-bd4d-125a40c9a1fc')
-  const { headers } = req
-  is(headers.authorization, 'at')
-  res.end(JSON.stringify({
-    error: null,
-    data: [{
-      id: '0baf874f-f72a-4d68-bac5-5c65e9ee9253',
-      name: 'test',
-      createdBy: '13db0ffe-1de4-46d3-b14c-ff239dd5ce1f',
-      createdAt: '2021-03-02T21:07:14.487787Z',
-      updatedAt: '2021-03-02T21:07:14.487787Z'
-    }]
-  }))
-
-  same(await transaction, [{
-    id: '0baf874f-f72a-4d68-bac5-5c65e9ee9253',
-    name: 'test',
-    createdBy: '13db0ffe-1de4-46d3-b14c-ff239dd5ce1f',
-    createdAt: '2021-03-02T21:07:14.487787Z',
-    updatedAt: '2021-03-02T21:07:14.487787Z'
-  }])
-
-  server.close()
-})
-
-test('teams api error', async ({ is, rejects, teardown }) => {
-  const server = createServer()
-  teardown(() => server.close())
-  await promisify(server.listen.bind(server))()
-  const service = `http://localhost:${server.address().port}`
-
-  const sig = await readFile(join(__dirname, 'fixtures', 'private.pem'))
-
-  const transaction = keycloak({
-    pages: {
-      signup: Buffer.from('signup'), signin: Buffer.from('signin'), error: Buffer.from('error')
-    },
-    realm: 'test',
-    url: service,
-    id: 'test-id'
-  }).teams({
-    accessToken: 'at',
-    refreshToken: 'rt',
-    idToken: jwt.sign({
-      jti: 'db34922c-b52e-47b7-8b54-d6a2e8afbc1f',
-      nbf: 0,
-      iss: `${service}/realms/test`,
-      sub: 'd7b55810-239b-4837-bd4d-125a40c9a1fc',
-      typ: 'ID',
-      azp: 'test-id',
-      aud: 'test-id',
-      nonce: 'b2c82b30-6b3a-11eb-aefb-db0eadc96f2e',
-      session_state: '45cdc1df-f8eb-4470-864d-235196ec09c6',
-      acr: '1',
-      email_verified: false,
-      name: 'test test',
-      preferred_username: 'test',
-      given_name: 'test',
-      family_name: 'test',
-      email: 'test@test.com'
-    }, sig, { algorithm: 'RS256', expiresIn: 2592000, header: { kid: 'testkid' } }),
-    sessionState: 'ss'
-  })
-
-  const [req, res] = await once(server, 'request')
-  is(req.url, '/private/teams?userId=d7b55810-239b-4837-bd4d-125a40c9a1fc')
-  const { headers } = req
-  is(headers.authorization, 'at')
-  res.end(JSON.stringify({
-    error: 'test',
-    data: null
-  }))
-
-  await rejects(transaction, Error('test'))
-
-  server.close()
-})
-
-test('teams unauthorized', async ({ is, rejects, teardown }) => {
-  const server = createServer()
-  teardown(() => server.close())
-  await promisify(server.listen.bind(server))()
-  const service = `http://localhost:${server.address().port}`
-
-  const sig = await readFile(join(__dirname, 'fixtures', 'private.pem'))
-
-  const transaction = keycloak({
-    pages: {
-      signup: Buffer.from('signup'), signin: Buffer.from('signin'), error: Buffer.from('error')
-    },
-    realm: 'test',
-    url: service,
-    id: 'test-id'
-  }).teams({
-    accessToken: 'at',
-    refreshToken: 'rt',
-    idToken: jwt.sign({
-      jti: 'db34922c-b52e-47b7-8b54-d6a2e8afbc1f',
-      nbf: 0,
-      iss: `${service}/realms/test`,
-      sub: 'd7b55810-239b-4837-bd4d-125a40c9a1fc',
-      typ: 'ID',
-      azp: 'test-id',
-      aud: 'test-id',
-      nonce: 'b2c82b30-6b3a-11eb-aefb-db0eadc96f2e',
-      session_state: '45cdc1df-f8eb-4470-864d-235196ec09c6',
-      acr: '1',
-      email_verified: false,
-      name: 'test test',
-      preferred_username: 'test',
-      given_name: 'test',
-      family_name: 'test',
-      email: 'test@test.com'
-    }, sig, { algorithm: 'RS256', expiresIn: 2592000, header: { kid: 'testkid' } }),
-    sessionState: 'ss'
-  })
-
-  const [req, res] = await once(server, 'request')
-  is(req.url, '/private/teams?userId=d7b55810-239b-4837-bd4d-125a40c9a1fc')
-  res.statusCode = 401
-  res.end(JSON.stringify({}))
-
-  await rejects(transaction, {
-    message: 'Unauthorized',
-    code: 'ERR_UNAUTHORIZED'
-  })
-
-  server.close()
 })
 
 test('backend mode signup', async ({ rejects }) => {
