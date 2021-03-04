@@ -250,6 +250,7 @@ test('exposes endpoints', async ({ same }) => {
 
     same(endpoints, {
       tokens: 'http://localhost:9999/realms/test/protocol/openid-connect/token',
+      userinfo: 'http://localhost:9999/realms/test/protocol/openid-connect/userinfo',
       passwords: 'http://localhost:9999/realms/test/account/password',
       registrations: 'http://localhost:9999/realms/test/protocol/openid-connect/registrations',
       resets: 'http://localhost:9999/realms/test/login-actions/reset-credentials',
@@ -271,6 +272,7 @@ test('exposes endpoints', async ({ same }) => {
 
     same(endpoints, {
       tokens: 'http://localhost:9999/realms/test/protocol/openid-connect/token',
+      userinfo: 'http://localhost:9999/realms/test/protocol/openid-connect/userinfo',
       passwords: 'http://localhost:9999/realms/test/account/password',
       registrations: 'http://localhost:9999/realms/test/protocol/openid-connect/registrations',
       resets: 'http://localhost:9999/realms/test/login-actions/reset-credentials',
@@ -828,6 +830,105 @@ test('refresh invalid grant with corrupt body', async ({ is, teardown, rejects }
   is(body.refresh_token, 'rt')
   res.statusCode = 400
   res.end('not some json')
+  await rejects(transaction)
+  server.close()
+})
+
+test('verify input validation', async ({ rejects }) => {
+  await rejects(keycloak({
+    pages: {
+      signup: Buffer.from('signup'), signin: Buffer.from('signin'), error: Buffer.from('error')
+    },
+    realm: 'test',
+    url: 'http://localhost:8080',
+    id: 'test-id'
+  }).verify(), Error(ERR_MISSING_ACCESS_TOKEN))
+})
+
+test('verify', async ({ is, teardown }) => {
+  const server = createServer()
+  teardown(() => server.close())
+  await promisify(server.listen.bind(server))()
+  const service = `http://localhost:${server.address().port}`
+  const transaction = keycloak({
+    pages: {
+      signup: Buffer.from('signup'), signin: Buffer.from('signin'), error: Buffer.from('error')
+    },
+    realm: 'test',
+    url: service,
+    id: 'test-id'
+  }).verify('at')
+
+  const [req, res] = await once(server, 'request')
+  is(req.url, '/realms/test/protocol/openid-connect/userinfo')
+  const { headers } = req
+  is(headers.authorization, 'Bearer at')
+  res.end(JSON.stringify({
+    sub: 'c2979802-6223-4f0e-ad93-61755053dab2',
+    email_verified: false,
+    name: 'm c',
+    preferred_username: 'matthewctoai',
+    given_name: 'm',
+    family_name: 'c',
+    email: 'matthew@cto.ai'
+  }))
+
+  const result = await transaction
+  is(result, true)
+  server.close()
+})
+
+test('verify unauthorized request', async ({ is, teardown }) => {
+  const server = createServer()
+  teardown(() => server.close())
+  await promisify(server.listen.bind(server))()
+  const service = `http://localhost:${server.address().port}`
+  const transaction = keycloak({
+    pages: {
+      signup: Buffer.from('signup'), signin: Buffer.from('signin'), error: Buffer.from('error')
+    },
+    realm: 'test',
+    url: service,
+    id: 'test-id'
+  }).verify('at')
+
+  const [req, res] = await once(server, 'request')
+  is(req.url, '/realms/test/protocol/openid-connect/userinfo')
+  const { headers } = req
+  is(headers.authorization, 'Bearer at')
+  res.statusCode = 401
+  res.end(JSON.stringify({
+    error: 'invalid_token',
+    error_description: 'Stale token'
+  }))
+  is(await transaction, false)
+  server.close()
+})
+
+test('verify some failure in keycloak', async ({ is, teardown, rejects }) => {
+  const server = createServer()
+  teardown(() => server.close())
+  await promisify(server.listen.bind(server))()
+  const service = `http://localhost:${server.address().port}`
+  const transaction = keycloak({
+    pages: {
+      signup: Buffer.from('signup'), signin: Buffer.from('signin'), error: Buffer.from('error')
+    },
+    realm: 'test',
+    url: service,
+    id: 'test-id'
+  }).verify('at')
+
+  const [req, res] = await once(server, 'request')
+  is(req.url, '/realms/test/protocol/openid-connect/userinfo')
+  const { headers } = req
+  is(headers.authorization, 'Bearer at')
+  res.statusCode = 400
+  res.end(JSON.stringify({
+    error: 'invalid_token',
+    error_description: 'Stale token'
+  }))
+
   await rejects(transaction)
   server.close()
 })
