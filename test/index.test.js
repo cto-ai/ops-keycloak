@@ -685,6 +685,7 @@ test('signout', async ({ is, teardown }) => {
   const { headers } = req
   is(headers['content-type'], 'application/x-www-form-urlencoded')
   is(headers['content-length'], '34')
+  is(headers.authorization, 'Bearer at')
   const [data] = await once(req, 'data')
   const body = qs.parse(data.toString())
   is(body.client_id, 'test-id')
@@ -857,7 +858,7 @@ test('verify', async ({ is, teardown }) => {
     realm: 'test',
     url: service,
     id: 'test-id'
-  }).verify('at')
+  }).verify({ accessToken: 'at' })
 
   const [req, res] = await once(server, 'request')
   is(req.url, '/realms/test/protocol/openid-connect/userinfo')
@@ -890,7 +891,7 @@ test('verify unauthorized request', async ({ is, teardown }) => {
     realm: 'test',
     url: service,
     id: 'test-id'
-  }).verify('at')
+  }).verify({ accessToken: 'at' })
 
   const [req, res] = await once(server, 'request')
   is(req.url, '/realms/test/protocol/openid-connect/userinfo')
@@ -917,7 +918,7 @@ test('verify some failure in keycloak', async ({ is, teardown, rejects }) => {
     realm: 'test',
     url: service,
     id: 'test-id'
-  }).verify('at')
+  }).verify({ accessToken: 'at' })
 
   const [req, res] = await once(server, 'request')
   is(req.url, '/realms/test/protocol/openid-connect/userinfo')

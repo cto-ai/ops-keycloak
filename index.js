@@ -259,7 +259,7 @@ function keycloak ({ pages = {}, realm, url, id, backend = false } = {}) {
     }
   }
 
-  async function verify (accessToken) {
+  async function verify ({ accessToken } = {}) {
     debug('Verifying that access token will work')
     if (!accessToken) throw Error(ERR_MISSING_ACCESS_TOKEN)
 
@@ -328,6 +328,7 @@ function keycloak ({ pages = {}, realm, url, id, backend = false } = {}) {
   }
 
   async function signout (tokens = {}) {
+    debug('Signing out!')
     const { accessToken, refreshToken } = tokens
     if (!accessToken) throw Error(ERR_MISSING_ACCESS_TOKEN)
     if (!refreshToken) throw Error(ERR_MISSING_REFRESH_TOKEN)
@@ -338,7 +339,7 @@ function keycloak ({ pages = {}, realm, url, id, backend = false } = {}) {
     await got.post(endpoints.logouts, {
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',
-        Authorization: accessToken,
+        Authorization: `Bearer ${accessToken}`,
         'Content-Length': data.length
       },
       body: data
