@@ -255,7 +255,10 @@ test('exposes endpoints', async ({ same }) => {
       registrations: 'http://localhost:9999/realms/test/protocol/openid-connect/registrations',
       resets: 'http://localhost:9999/realms/test/login-actions/reset-credentials',
       logins: 'http://localhost:9999/realms/test/protocol/openid-connect/auth',
-      logouts: 'http://localhost:9999/realms/test/protocol/openid-connect/logout'
+      logouts: 'http://localhost:9999/realms/test/protocol/openid-connect/logout',
+      admin: {
+        allUsers: 'http://localhost:9999/admin/realms/test/users'
+      }
     })
   }
 
@@ -277,7 +280,10 @@ test('exposes endpoints', async ({ same }) => {
       registrations: 'http://localhost:9999/realms/test/protocol/openid-connect/registrations',
       resets: 'http://localhost:9999/realms/test/login-actions/reset-credentials',
       logins: 'http://localhost:9999/realms/test/protocol/openid-connect/auth',
-      logouts: 'http://localhost:9999/realms/test/protocol/openid-connect/logout'
+      logouts: 'http://localhost:9999/realms/test/protocol/openid-connect/logout',
+      admin: {
+        allUsers: 'http://localhost:9999/admin/realms/test/users'
+      }
     })
   }
 })
@@ -693,6 +699,130 @@ test('signout', async ({ is, teardown }) => {
   res.setHeader('content-type', 'application/json')
   res.end()
   await transaction
+  server.close()
+})
+
+test('admin allUsers input validation', async ({ rejects }) => {
+  await rejects(keycloak({
+    pages: {
+      signup: Buffer.from('signup'), signin: Buffer.from('signin'), error: Buffer.from('error')
+    },
+    realm: 'test',
+    url: 'http://localhost:8080',
+    id: 'test-id'
+  }).allUsers(), Error(ERR_MISSING_ACCESS_TOKEN))
+})
+
+test('admin allUsers success', async ({ is, teardown }) => {
+  const server = createServer()
+  teardown(() => server.close())
+  await promisify(server.listen.bind(server))()
+  const service = `http://localhost:${server.address().port}`
+  const transaction = keycloak({
+    pages: {
+      signup: Buffer.from('signup'), signin: Buffer.from('signin'), error: Buffer.from('error')
+    },
+    realm: 'test',
+    url: service,
+    id: 'test-id'
+  }).allUsers({ accessToken: 'at' })
+
+  const [req, res] = await once(server, 'request')
+  is(req.url, '/admin/realms/test/users?first=0&max=100')
+  const { headers } = req
+  is(headers.authorization, 'Bearer at')
+
+  res.setHeader('content-type', 'application/json')
+  res.end(JSON.stringify([
+    {
+      limit: 100,
+      next: null,
+      users: {
+        id: 'your-classic-guid',
+        createdTimestamp: 1614972520,
+        username: 'matthewctoai',
+        emailVerified: true,
+        firstName: 'm',
+        lastName: 'c',
+        email: 'matthew@cto.ai',
+        attributes: {
+          organizationRole: ['engineer'],
+          terms_and_conditions: ['1602112992']
+        },
+        enabled: true,
+        totp: false,
+        disableableCredentialTypes: [],
+        requiredActions: [],
+        notBefore: 0,
+        access: {
+          manageGroupMembership: false,
+          view: true,
+          mapRoles: false,
+          impersonate: false,
+          manage: false
+        }
+      }
+    }
+  ]))
+
+  await transaction
+  server.close()
+})
+
+test('admin allUsers forbidden', async ({ is, teardown, rejects }) => {
+  const server = createServer()
+  teardown(() => server.close())
+  await promisify(server.listen.bind(server))()
+  const service = `http://localhost:${server.address().port}`
+  const transaction = keycloak({
+    pages: {
+      signup: Buffer.from('signup'), signin: Buffer.from('signin'), error: Buffer.from('error')
+    },
+    realm: 'test',
+    url: service,
+    id: 'test-id'
+  }).allUsers({ accessToken: 'not-enough-perms' })
+
+  const [req, res] = await once(server, 'request')
+  is(req.url, '/admin/realms/test/users?first=0&max=100')
+  const { headers } = req
+  is(headers.authorization, 'Bearer not-enough-perms')
+
+  res.statusCode = 403
+  res.setHeader('content-type', 'application/json')
+  res.end(JSON.stringify({ error: 'unknown_error' }))
+
+  await rejects(transaction, {
+    message: 'Forbidden',
+    code: 'ERR_FORBIDDEN'
+  })
+  server.close()
+})
+
+test('admin allUsers generic error', async ({ is, teardown, rejects }) => {
+  const server = createServer()
+  teardown(() => server.close())
+  await promisify(server.listen.bind(server))()
+  const service = `http://localhost:${server.address().port}`
+  const transaction = keycloak({
+    pages: {
+      signup: Buffer.from('signup'), signin: Buffer.from('signin'), error: Buffer.from('error')
+    },
+    realm: 'test',
+    url: service,
+    id: 'test-id'
+  }).allUsers({ accessToken: 'not-enough-perms' })
+
+  const [req, res] = await once(server, 'request')
+  is(req.url, '/admin/realms/test/users?first=0&max=100')
+  const { headers } = req
+  is(headers.authorization, 'Bearer not-enough-perms')
+
+  res.statusCode = 400
+  res.setHeader('content-type', 'application/json')
+  res.end()
+
+  await rejects(transaction)
   server.close()
 })
 

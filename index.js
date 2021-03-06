@@ -48,6 +48,7 @@ export const ERR_BACKEND_METHOD_NOT_SUPPORTED = (method) => {
   return `${method} is not supported in backend mode`
 }
 export const ERR_UNAUTHORIZED = (description = 'Unauthorized') => description
+export const ERR_FORBIDDEN = (description = 'Forbidden') => description
 
 class Granter extends Keycloak {
   constructor (config) {
@@ -112,6 +113,9 @@ function keycloak ({ pages = {}, realm, url, id, backend = false } = {}) {
   endpoints.resets = `${url}/realms/${realm}/login-actions/reset-credentials`
   endpoints.logins = `${url}/realms/${realm}/protocol/openid-connect/auth`
   endpoints.logouts = `${url}/realms/${realm}/protocol/openid-connect/logout`
+  endpoints.admin = {
+    allUsers: `${url}/admin/realms/${realm}/users`
+  }
 
   if (backend) {
     return dbg({
@@ -125,7 +129,8 @@ function keycloak ({ pages = {}, realm, url, id, backend = false } = {}) {
       identity,
       async signup () { throw Error(ERR_BACKEND_METHOD_NOT_SUPPORTED('signup')) },
       reset () { throw Error(ERR_BACKEND_METHOD_NOT_SUPPORTED('reset')) },
-      verify
+      verify,
+      allUsers
     }, { endpoints })
   }
 
@@ -346,6 +351,37 @@ function keycloak ({ pages = {}, realm, url, id, backend = false } = {}) {
     }).json()
   }
 
+  async function allUsers ({ accessToken } = {}, next = 0, limit = 100, filters = {}) {
+    debug('Getting all the users')
+    if (!accessToken) throw Error(ERR_MISSING_ACCESS_TOKEN)
+
+    try {
+      const users = await got(endpoints.admin.allUsers, {
+        headers: {
+          Authorization: `Bearer ${accessToken}`
+        },
+        searchParams: {
+          ...filters,
+          first: next,
+          max: limit
+        }
+      }).json()
+
+      return {
+        users,
+        limit,
+        next: users.length < limit ? null : next + limit
+      }
+    } catch (err) {
+      if (err.response && err.response.statusCode === 403) {
+        const err = Error(ERR_FORBIDDEN())
+        err.code = 'ERR_FORBIDDEN'
+        throw err
+      }
+      throw err
+    }
+  }
+
   function reset (opts = {}) {
     const { signedIn = false } = opts
     const to = signedIn ? endpoints.passwords : endpoints.resets
@@ -354,6 +390,6 @@ function keycloak ({ pages = {}, realm, url, id, backend = false } = {}) {
   }
 
   return dbg({
-    signup, signin, signout, validate, identity, refresh, reset, verify
+    signup, signin, signout, validate, identity, refresh, reset, verify, allUsers
   }, { endpoints })
 }
