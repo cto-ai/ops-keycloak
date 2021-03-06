@@ -824,7 +824,7 @@ test('admin allUsers paged', async ({ is, match, teardown }) => {
   match(parsed, { next: 1, limit: 1, users: [{ id: 'your-classic-uuid' }] })
 
   // pass the values from the result of the first transaction to the next request
-  const secondTransaction = kc.allUsers({ accessToken: 'at' }, 1, 1);
+  const secondTransaction = kc.allUsers({ accessToken: 'at' }, parsed.next, parsed.limit);
   [req, res] = await once(server, 'request')
   is(req.url, '/admin/realms/test/users?first=1&max=1')
   res.setHeader('content-type', 'application/json')
