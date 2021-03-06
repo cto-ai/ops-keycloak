@@ -713,7 +713,7 @@ test('admin allUsers input validation', async ({ rejects }) => {
   }).allUsers(), Error(ERR_MISSING_ACCESS_TOKEN))
 })
 
-test('admin allUsers success', async ({ is, teardown }) => {
+test('admin allUsers success', async ({ is, match, teardown }) => {
   const server = createServer()
   teardown(() => server.close())
   await promisify(server.listen.bind(server))()
@@ -735,9 +735,38 @@ test('admin allUsers success', async ({ is, teardown }) => {
   res.setHeader('content-type', 'application/json')
   res.end(JSON.stringify([
     {
-      limit: 100,
-      next: null,
-      users: {
+      id: 'your-classic-guid',
+      createdTimestamp: 1614972520,
+      username: 'matthewctoai',
+      emailVerified: true,
+      firstName: 'm',
+      lastName: 'c',
+      email: 'matthew@cto.ai',
+      attributes: {
+        organizationRole: ['engineer'],
+        terms_and_conditions: ['1602112992']
+      },
+      enabled: true,
+      totp: false,
+      disableableCredentialTypes: [],
+      requiredActions: [],
+      notBefore: 0,
+      access: {
+        manageGroupMembership: false,
+        view: true,
+        mapRoles: false,
+        impersonate: false,
+        manage: false
+      }
+    }
+  ]))
+
+  const parsed = await transaction
+  match(parsed, {
+    next: null,
+    limit: 100,
+    users: [
+      {
         id: 'your-classic-guid',
         createdTimestamp: 1614972520,
         username: 'matthewctoai',
@@ -762,10 +791,8 @@ test('admin allUsers success', async ({ is, teardown }) => {
           manage: false
         }
       }
-    }
-  ]))
-
-  await transaction
+    ]
+  })
   server.close()
 })
 
