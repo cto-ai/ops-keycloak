@@ -67,6 +67,26 @@ Will open a browser at a Keycloak password reset URL, which differs based on the
 
 Returns a promise that resolves the teams for the user that the tokens belong to.
 
+### `instance.verify(tokens) => Promise => boolean`
+
+Verify that Keycloak will accept the token as valid by making an authorized request to Keycloak.
+
+### `instance.allUsers(tokens, next, limit, filters) => Promise => pagedUser`
+
+Page through all users in Keycloak.
+
+**Arguments:**
+
+* `tokens` - `accessToken` is required
+* `next` - which indexed user to start from
+* `limit` - how many users to get in each request
+* `filters` - see available filters on [Keycloak website](https://www.keycloak.org/docs-api/12.0/rest-api/#_getusers) (note: `first` and `max` will be ignored)
+
+**`pagedUser`:**
+
+* `next` _int | null_ - the `next` parameter to get the next page or `null` if no more results
+* `limit` _int_ - always matches the limit passed by developer
+* `users` _Array<User>_ - see `UserRepresentation` on [Keycloak website](https://www.keycloak.org/docs-api/12.0/rest-api/#_userrepresentation)
 
 ### `instance.validate(tokens) => boolean`
 
