@@ -128,7 +128,7 @@ function keycloak ({ pages = {}, realm, url, id, backend = false } = {}) {
       async signup () { throw Error(ERR_BACKEND_METHOD_NOT_SUPPORTED('signup')) },
       reset () { throw Error(ERR_BACKEND_METHOD_NOT_SUPPORTED('reset')) },
       verify,
-      allUsers
+      users
     }, { endpoints })
   }
 
@@ -349,27 +349,22 @@ function keycloak ({ pages = {}, realm, url, id, backend = false } = {}) {
     }).json()
   }
 
-  async function allUsers ({ accessToken } = {}, { next = 0, limit = 100, filters = {} } = {}) {
+  async function * users ({ accessToken } = {}, { from = 0, to = 100, filters = {} } = {}) {
     debug('Getting all the users')
     if (!accessToken) throw Error(ERR_MISSING_ACCESS_TOKEN)
 
+    let users = []
     try {
-      const users = await got(endpoints.users, {
+      users = got(endpoints.users, {
         headers: {
           Authorization: `Bearer ${accessToken}`
         },
         searchParams: {
           ...filters,
-          first: next,
-          max: limit
+          first: from,
+          max: to
         }
       }).json()
-
-      return {
-        users,
-        limit,
-        next: users.length < limit ? null : next + limit
-      }
     } catch (err) {
       if (err.response && err.response.statusCode === 403) {
         const err = Error(ERR_FORBIDDEN())
@@ -378,6 +373,10 @@ function keycloak ({ pages = {}, realm, url, id, backend = false } = {}) {
       }
       throw err
     }
+
+    yield await users
+
+    // if (users.length === to) yield * await users({ accessToken }, { from: from + to, to, filters })
   }
 
   function reset (opts = {}) {
@@ -388,6 +387,6 @@ function keycloak ({ pages = {}, realm, url, id, backend = false } = {}) {
   }
 
   return dbg({
-    signup, signin, signout, validate, identity, refresh, reset, verify, allUsers
+    signup, signin, signout, validate, identity, refresh, reset, verify, users
   }, { endpoints })
 }
