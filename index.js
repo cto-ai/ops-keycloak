@@ -113,9 +113,7 @@ function keycloak ({ pages = {}, realm, url, id, backend = false } = {}) {
   endpoints.resets = `${url}/realms/${realm}/login-actions/reset-credentials`
   endpoints.logins = `${url}/realms/${realm}/protocol/openid-connect/auth`
   endpoints.logouts = `${url}/realms/${realm}/protocol/openid-connect/logout`
-  endpoints.admin = {
-    allUsers: `${url}/admin/realms/${realm}/users`
-  }
+  endpoints.users = `${url}/admin/realms/${realm}/users`
 
   if (backend) {
     return dbg({
@@ -351,12 +349,12 @@ function keycloak ({ pages = {}, realm, url, id, backend = false } = {}) {
     }).json()
   }
 
-  async function allUsers ({ accessToken } = {}, next = 0, limit = 100, filters = {}) {
+  async function allUsers ({ accessToken } = {}, { next = 0, limit = 100, filters = {} } = {}) {
     debug('Getting all the users')
     if (!accessToken) throw Error(ERR_MISSING_ACCESS_TOKEN)
 
     try {
-      const users = await got(endpoints.admin.allUsers, {
+      const users = await got(endpoints.users, {
         headers: {
           Authorization: `Bearer ${accessToken}`
         },

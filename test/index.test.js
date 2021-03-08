@@ -256,9 +256,7 @@ test('exposes endpoints', async ({ same }) => {
       resets: 'http://localhost:9999/realms/test/login-actions/reset-credentials',
       logins: 'http://localhost:9999/realms/test/protocol/openid-connect/auth',
       logouts: 'http://localhost:9999/realms/test/protocol/openid-connect/logout',
-      admin: {
-        allUsers: 'http://localhost:9999/admin/realms/test/users'
-      }
+      users: 'http://localhost:9999/admin/realms/test/users'
     })
   }
 
@@ -281,9 +279,7 @@ test('exposes endpoints', async ({ same }) => {
       resets: 'http://localhost:9999/realms/test/login-actions/reset-credentials',
       logins: 'http://localhost:9999/realms/test/protocol/openid-connect/auth',
       logouts: 'http://localhost:9999/realms/test/protocol/openid-connect/logout',
-      admin: {
-        allUsers: 'http://localhost:9999/admin/realms/test/users'
-      }
+      users: 'http://localhost:9999/admin/realms/test/users'
     })
   }
 })
@@ -811,7 +807,7 @@ test('admin allUsers paged', async ({ is, match, teardown }) => {
     id: 'test-id'
   })
 
-  const firstTransaction = kc.allUsers({ accessToken: 'at' }, 0, 1)
+  const firstTransaction = kc.allUsers({ accessToken: 'at' }, { next: 0, limit: 1 })
   let [req, res] = await once(server, 'request')
   is(req.url, '/admin/realms/test/users?first=0&max=1')
   const { headers } = req
@@ -824,7 +820,7 @@ test('admin allUsers paged', async ({ is, match, teardown }) => {
   match(parsed, { next: 1, limit: 1, users: [{ id: 'your-classic-uuid' }] })
 
   // pass the values from the result of the first transaction to the next request
-  const secondTransaction = kc.allUsers({ accessToken: 'at' }, parsed.next, parsed.limit);
+  const secondTransaction = kc.allUsers({ accessToken: 'at' }, { next: parsed.next, limit: parsed.limit });
   [req, res] = await once(server, 'request')
   is(req.url, '/admin/realms/test/users?first=1&max=1')
   res.setHeader('content-type', 'application/json')
