@@ -698,7 +698,7 @@ test('signout', async ({ is, teardown }) => {
   server.close()
 })
 
-test('admin allUsers input validation', async ({ rejects }) => {
+test('admin users input validation', async ({ rejects }) => {
   await rejects(keycloak({
     pages: {
       signup: Buffer.from('signup'), signin: Buffer.from('signin'), error: Buffer.from('error')
@@ -706,10 +706,10 @@ test('admin allUsers input validation', async ({ rejects }) => {
     realm: 'test',
     url: 'http://localhost:8080',
     id: 'test-id'
-  }).allUsers(), Error(ERR_MISSING_ACCESS_TOKEN))
+  }).users(), Error(ERR_MISSING_ACCESS_TOKEN))
 })
 
-test('admin allUsers success', async ({ is, match, teardown }) => {
+test('admin users success', async ({ is, match, teardown }) => {
   const server = createServer()
   teardown(() => server.close())
   await promisify(server.listen.bind(server))()
@@ -721,7 +721,7 @@ test('admin allUsers success', async ({ is, match, teardown }) => {
     realm: 'test',
     url: service,
     id: 'test-id'
-  }).allUsers({ accessToken: 'at' })
+  }).users({ accessToken: 'at' })
 
   const [req, res] = await once(server, 'request')
   is(req.url, '/admin/realms/test/users?first=0&max=100')
@@ -792,7 +792,7 @@ test('admin allUsers success', async ({ is, match, teardown }) => {
   server.close()
 })
 
-test('admin allUsers paged', async ({ is, match, teardown }) => {
+test('admin users paged', async ({ is, match, teardown }) => {
   const server = createServer()
   teardown(() => server.close())
   await promisify(server.listen.bind(server))()
@@ -807,7 +807,7 @@ test('admin allUsers paged', async ({ is, match, teardown }) => {
     id: 'test-id'
   })
 
-  const firstTransaction = kc.allUsers({ accessToken: 'at' }, { next: 0, limit: 1 })
+  const firstTransaction = kc.users({ accessToken: 'at' }, { next: 0, limit: 1 })
   let [req, res] = await once(server, 'request')
   is(req.url, '/admin/realms/test/users?first=0&max=1')
   const { headers } = req
@@ -820,7 +820,7 @@ test('admin allUsers paged', async ({ is, match, teardown }) => {
   match(parsed, { next: 1, limit: 1, users: [{ id: 'your-classic-uuid' }] })
 
   // pass the values from the result of the first transaction to the next request
-  const secondTransaction = kc.allUsers({ accessToken: 'at' }, { next: parsed.next, limit: parsed.limit });
+  const secondTransaction = kc.users({ accessToken: 'at' }, { next: parsed.next, limit: parsed.limit });
   [req, res] = await once(server, 'request')
   is(req.url, '/admin/realms/test/users?first=1&max=1')
   res.setHeader('content-type', 'application/json')
@@ -832,7 +832,7 @@ test('admin allUsers paged', async ({ is, match, teardown }) => {
   server.close()
 })
 
-test('admin allUsers forbidden', async ({ is, teardown, rejects }) => {
+test('admin users forbidden', async ({ is, teardown, rejects }) => {
   const server = createServer()
   teardown(() => server.close())
   await promisify(server.listen.bind(server))()
@@ -844,7 +844,7 @@ test('admin allUsers forbidden', async ({ is, teardown, rejects }) => {
     realm: 'test',
     url: service,
     id: 'test-id'
-  }).allUsers({ accessToken: 'not-enough-perms' })
+  }).users({ accessToken: 'not-enough-perms' })
 
   const [req, res] = await once(server, 'request')
   is(req.url, '/admin/realms/test/users?first=0&max=100')
@@ -862,7 +862,7 @@ test('admin allUsers forbidden', async ({ is, teardown, rejects }) => {
   server.close()
 })
 
-test('admin allUsers generic error', async ({ is, teardown, rejects }) => {
+test('admin users generic error', async ({ is, teardown, rejects }) => {
   const server = createServer()
   teardown(() => server.close())
   await promisify(server.listen.bind(server))()
@@ -874,7 +874,7 @@ test('admin allUsers generic error', async ({ is, teardown, rejects }) => {
     realm: 'test',
     url: service,
     id: 'test-id'
-  }).allUsers({ accessToken: 'not-enough-perms' })
+  }).users({ accessToken: 'not-enough-perms' })
 
   const [req, res] = await once(server, 'request')
   is(req.url, '/admin/realms/test/users?first=0&max=100')
