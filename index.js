@@ -349,12 +349,12 @@ function keycloak ({ pages = {}, realm, url, id, backend = false } = {}) {
     }).json()
   }
 
-  async function users ({ accessToken } = {}, { next = 0, limit = 100, filters = {} } = {}) {
-    debug('Getting all the users')
+  async function * users ({ accessToken } = {}, { next = 0, limit = 100, filters = {} } = {}) {
     if (!accessToken) throw Error(ERR_MISSING_ACCESS_TOKEN)
 
+    let userList = []
     try {
-      const users = await got(endpoints.users, {
+      userList = await got(endpoints.users, {
         headers: {
           Authorization: `Bearer ${accessToken}`
         },
@@ -365,11 +365,7 @@ function keycloak ({ pages = {}, realm, url, id, backend = false } = {}) {
         }
       }).json()
 
-      return {
-        users,
-        limit,
-        next: users.length < limit ? null : next + limit
-      }
+      yield userList
     } catch (err) {
       if (err.response && err.response.statusCode === 403) {
         const err = Error(ERR_FORBIDDEN())
@@ -378,6 +374,8 @@ function keycloak ({ pages = {}, realm, url, id, backend = false } = {}) {
       }
       throw err
     }
+
+    if (userList.length >= limit) yield * users({ accessToken }, { next: next + limit, limit })
   }
 
   function reset (opts = {}) {
